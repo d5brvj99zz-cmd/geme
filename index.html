@@ -2,27 +2,37 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ボス完全体版！まったりシューティング</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>超快適スピード版！まったりシューティング</title>
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
         body {
             margin: 0;
-            background: #f0f0f0;
+            padding: 0;
+            background: #f0f0f0; /* ★画面外の背景を元の明るいグレーに戻しました */
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: #333;
-            font-family: sans-serif;
+            width: 100vw;
             overflow: hidden;
-            touch-action: none;
+            position: fixed; 
+            touch-action: none; 
         }
         canvas {
+            background: #fff; /* ★ゲーム画面の背景を白に戻しました */
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
             border: 2px solid #333;
-            background: #fff;
             max-width: 100%;
-            max-height: 100vh;
-            cursor: pointer;
+            max-height: 100%;
+            object-fit: contain;
+            aspect-ratio: 400 / 500;
         }
     </style>
 </head>
@@ -33,6 +43,11 @@
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+
+// iOS（Safari）のタッチバグを強力に防止
+document.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+}, { passive: false });
 
 // --- 画像の読み込み設定 ---
 const imgPlayer = new Image(); imgPlayer.src = 'images/player.png';
@@ -85,21 +100,20 @@ let damageCooldown = 0;
 
 let gameTimer = 0; 
 
-// ボスのステータス（サイズやターゲットY座標を追加）
 let boss = {
     x: 150,
     y: -100,
-    baseWidth: 100,   // 通常時の幅
-    baseHeight: 80,   // 通常時の高さ
+    baseWidth: 100,  
+    baseHeight: 80,  
     width: 100, 
     height: 80,
     hp: 120,
     maxHp: 120,
-    speed: 0.8,
+    speed: 1.5,       // ★ボスの左右移動スピードアップ（0.8 -> 1.5）
     active: false, 
     shotTimer: 0,
-    targetY: 40,      // 目標とするY座標（前進用）
-    stateTimer: 0     // 変形や前進の持続時間
+    targetY: 40,      
+    stateTimer: 0     
 };
 let bossBullets = [];
 let isEndingSequence = false; 
@@ -154,39 +168,40 @@ function playerDamage() {
     }
 }
 
-// --- マウス・タッチ移動処理 ---
+// --- iPhoneのタッチ位置座標変換 ---
+function getTouchX(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    return (clientX - rect.left) * scaleX;
+}
+
 function handleMouseMove(e) {
     if (!gameStarted || gameOver || gameClear || isEndingSequence) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const canvasWidthScale = canvas.width / rect.width;
-    player.x = (mouseX * canvasWidthScale) - player.width / 2;
+    let canvasX = getTouchX(e.clientX);
+    player.x = canvasX - player.width / 2;
     if (player.x < 0) player.x = 0;
     if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
 }
 
 function handleTouch(e) {
-    e.preventDefault();
     if (!gameStarted || gameOver || gameClear || isEndingSequence) return;
-    const rect = canvas.getBoundingClientRect();
-    const touchX = e.touches[0].clientX - rect.left;
-    const canvasWidthScale = canvas.width / rect.width;
-    player.x = (touchX * canvasWidthScale) - player.width / 2;
+    let canvasX = getTouchX(e.touches[0].clientX);
+    player.x = canvasX - player.width / 2;
     if (player.x < 0) player.x = 0;
     if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
 }
 
 canvas.addEventListener("mousedown", startGame);
 canvas.addEventListener("mousemove", handleMouseMove);
-canvas.addEventListener("touchstart", (e) => { e.preventDefault(); startGame(); }, { passive: false });
-canvas.addEventListener("touchmove", handleTouch, { passive: false });
+canvas.addEventListener("touchstart", (e) => { startGame(); }, { passive: true });
+canvas.addEventListener("touchmove", handleTouch, { passive: true });
 
 function drawStartScreen() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#333";
     ctx.font = "22px sans-serif";
-    ctx.fillText("クリック または タップで", 70, 230);
-    ctx.fillText("ゲームスタート！", 115, 275);
+    ctx.fillText("画面をタップして", 120, 230);
+    ctx.fillText("ゲームスタート！", 120, 275);
 }
 setTimeout(drawStartScreen, 100);
 
@@ -199,7 +214,7 @@ function gameLoop() {
         ctx.fillText("GAME OVER", 110, 230);
         ctx.fillStyle = "#333";
         ctx.font = "20px sans-serif";
-        ctx.fillText("クリック / タップでリトライ", 80, 280);
+        ctx.fillText("タップでリトライ", 130, 280);
         return;
     }
 
@@ -218,11 +233,11 @@ function gameLoop() {
     gameTimer++;
     if (damageCooldown > 0) damageCooldown--; 
 
-    // 1. 自機の自動連射
+    // 1. 自機の自動連射（★連射速度をアップ 35 -> 20）
     if (shotTimer === 0 && !isEndingSequence) {
         bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 12 });
         playSound('sounds/shot.mp3');
-        shotTimer = 35; 
+        shotTimer = 20; 
     }
     if (shotTimer > 0) shotTimer--;
 
@@ -233,25 +248,28 @@ function gameLoop() {
         bgmBoss.play().catch(e => console.log(e));
     }
 
-    // 3. ザコ敵の自動生成
+    // 3. ザコ敵の自動生成（出現率をスマホ向けに微調整）
     if (!boss.active && score < 5000 && !isEndingSequence) {
-        let spawnChance = 0.008; 
-        if (gameTimer > 3600) spawnChance = 0.015;      
-        else if (gameTimer > 1800) spawnChance = 0.01;       
+        let spawnChance = 0.012; 
+        if (gameTimer > 3600) spawnChance = 0.022;      
+        else if (gameTimer > 1800) spawnChance = 0.016;       
 
         if (Math.random() < spawnChance) { 
             let rand = Math.random();
             let enemyType, enemyImg, enemySpeed, enemyHp;
 
             if (rand < 0.5) {
+                // 普通の敵（★スピードアップ 0.5~1.0 -> 1.0~1.8）
                 enemyType = 1; enemyImg = imgEnemy1; enemyHp = 1;
-                enemySpeed = 0.5 + Math.random() * 0.5;
+                enemySpeed = 1.0 + Math.random() * 0.8;
             } else if (rand < 0.8) {
+                // 高速の敵（★スピードアップ 1.0~1.5 -> 2.0~3.0）
                 enemyType = 2; enemyImg = imgEnemy2; enemyHp = 1;
-                enemySpeed = 1.0 + Math.random() * 0.5;
+                enemySpeed = 2.0 + Math.random() * 1.0;
             } else {
+                // タフな敵（★スピードアップ 0.4~0.7 -> 0.8~1.3）
                 enemyType = 3; enemyImg = imgEnemy3; enemyHp = 3;
-                enemySpeed = 0.4 + Math.random() * 0.3;
+                enemySpeed = 0.8 + Math.random() * 0.5;
             }
 
             enemies.push({ 
@@ -262,10 +280,10 @@ function gameLoop() {
         }
     }
 
-    // 4. 自機の弾の移動
+    // 4. 自機の弾の移動（★弾速アップ 4 -> 7）
     ctx.fillStyle = "#00bfff"; 
     bullets.forEach((bullet, bIndex) => {
-        bullet.y -= 4;
+        bullet.y -= 7;
         ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
         if (bullet.y < 0) bullets.splice(bIndex, 1);
     });
@@ -284,72 +302,65 @@ function gameLoop() {
         if (enemy.y > canvas.height) enemies.splice(eIndex, 1);
     });
 
-    // 6. ボスの処理（移動・巨大化・前進アルゴリズム）
+    // 6. ボスの処理
     if (boss.active) {
-        // 初期登場カットイン移動
         if (boss.y < 40 && boss.stateTimer === 0) {
-            boss.y += 0.3; 
+            boss.y += 0.6; // 登場速度アップ
         } else {
-            // 通常の左右移動
             boss.x += boss.speed;
             if (boss.x < 0 || boss.x > canvas.width - boss.width) {
                 boss.speed *= -1;
             }
 
-            // Y座標を目標（targetY）に向けてスムーズに近づける（前進・後退用）
+            // 前進・後退のスムーズ移動の速度アップ（0.8 -> 1.8）
             if (Math.abs(boss.y - boss.targetY) > 0.5) {
-                boss.y += (boss.y < boss.targetY) ? 0.8 : -0.8;
+                boss.y += (boss.y < boss.targetY) ? 1.8 : -1.8;
             }
 
-            // タイマーのカウントダウン
             if (boss.stateTimer > 0) {
                 boss.stateTimer--;
-                // 状態終了時のリセット処理
                 if (boss.stateTimer === 0) {
-                    boss.targetY = 40; // 上に戻る
-                    boss.width = boss.baseWidth;   // サイズを元に戻す
+                    boss.targetY = 40; 
+                    boss.width = boss.baseWidth;   
                     boss.height = boss.baseHeight;
                 }
             }
 
-            // 行動・攻撃ルーチン
+            // ★ボスの攻撃ルーチン（弾速などを全体的にスピードアップ）
             if (boss.shotTimer === 0) {
                 let pattern = Math.random();
                 let bx = boss.x + boss.width / 2;
                 let by = boss.y + boss.height;
 
                 if (pattern < 0.2) {
-                    // 【新】パターン1: 巨大化（サイズを1.5倍にする、180フレーム持続）
                     boss.width = boss.baseWidth * 1.5;
                     boss.height = boss.baseHeight * 1.5;
-                    boss.stateTimer = 180;
+                    boss.stateTimer = 150; // 巨大化時間を少し短くして回転率アップ
                 } else if (pattern < 0.4) {
-                    // 【新】パターン2: 前進突撃（目標Y座標を下に下げる、200フレーム持続）
-                    boss.targetY = 160; 
-                    boss.stateTimer = 200;
+                    boss.targetY = 180; // より深く前進突撃
+                    boss.stateTimer = 160;
                 } else if (pattern < 0.6) {
-                    // 【新】パターン3: 丸の攻撃（丸くて大きい弾を撃ち出す）
-                    bossBullets.push({ x: bx, y: by, isCircle: true, radius: 20, vx: 0, vy: 1.0 });
+                    // 丸の攻撃（★弾速アップ 1.0 -> 2.0）
+                    bossBullets.push({ x: bx, y: by, isCircle: true, radius: 20, vx: 0, vy: 2.0 });
                 } else if (pattern < 0.8) {
-                    // パターン4: 3方向拡散弾
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: -0.5, vy: 1.4, isCircle: false });
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0,    vy: 1.5, isCircle: false });
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0.5,  vy: 1.4, isCircle: false });
+                    // 3方向拡散弾（★弾速アップ vy: 1.4~1.5 -> 2.4~2.5）
+                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: -0.8, vy: 2.4, isCircle: false });
+                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0,    vy: 2.5, isCircle: false });
+                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0.8,  vy: 2.4, isCircle: false });
                 } else {
-                    // パターン5: 狙い撃ち高速弾
+                    // 狙い撃ち高速弾（★弾速倍率アップ 1.6 -> 2.8）
                     let targetX = player.x + player.width / 2;
                     let targetY = player.y + player.height / 2;
                     let diffX = targetX - bx;
                     let diffY = targetY - by;
                     let dist = Math.sqrt(diffX * diffX + diffY * diffY);
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 1.6, vy: (diffY / dist) * 1.6, isCircle: false });
+                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 2.8, vy: (diffY / dist) * 2.8, isCircle: false });
                 }
-                boss.shotTimer = 110; 
+                boss.shotTimer = 80; // ★次の攻撃までの間隔を短縮（110 -> 80）
             }
         }
         if (boss.shotTimer > 0) boss.shotTimer--;
 
-        // ボス描画
         if (imagesLoaded === totalImages) {
             ctx.drawImage(imgBoss, boss.x, boss.y, boss.width, boss.height);
         }
@@ -360,14 +371,13 @@ function gameLoop() {
         ctx.fillStyle = "red";
         ctx.fillRect(100, 15, 200 * (boss.hp / boss.maxHp), 8);
 
-        // ボス本体との衝突判定
         if (boss.x < player.x + player.width * 0.7 && boss.x + boss.width > player.x + player.width * 0.3 &&
             boss.y < player.y + player.height * 0.7 && boss.y + boss.height > player.y + player.height * 0.3) {
             playerDamage();
         }
     }
 
-    // 7. ボスの弾の処理（通常長方形弾・丸い弾の分岐）
+    // 7. ボスの弾の処理
     bossBullets.forEach((bBullet, bbIndex) => {
         bBullet.x += bBullet.vx; 
         bBullet.y += bBullet.vy; 
@@ -375,19 +385,16 @@ function gameLoop() {
         let isHit = false;
 
         if (bBullet.isCircle) {
-            // ★丸い攻撃の描画
             ctx.fillStyle = "purple";
             ctx.beginPath();
             ctx.arc(bBullet.x, bBullet.y, bBullet.radius, 0, Math.PI * 2);
             ctx.fill();
 
-            // 丸い弾とプレイヤーの当たり判定（簡易矩形判定）
             if (bBullet.x - bBullet.radius < player.x + player.width * 0.7 && bBullet.x + bBullet.radius > player.x + player.width * 0.3 &&
                 bBullet.y - bBullet.radius < player.y + player.height * 0.7 && bBullet.y + bBullet.radius > player.y + player.height * 0.3) {
                 isHit = true;
             }
         } else {
-            // 通常の四角い弾の描画
             ctx.fillStyle = "purple";
             ctx.fillRect(bBullet.x, bBullet.y, bBullet.width, bBullet.height);
 
@@ -402,13 +409,12 @@ function gameLoop() {
             bossBullets.splice(bbIndex, 1);
         }
         
-        // 画面外消去
         if (bBullet.y > canvas.height || bBullet.x < -30 || bBullet.x > canvas.width + 30) {
             bossBullets.splice(bbIndex, 1);
         }
     });
 
-    // 8. 当たり判定（自機の弾 → 敵・ボス）
+    // 8. 当たり判定
     bullets.forEach((bullet, bIndex) => {
         enemies.forEach((enemy, eIndex) => {
             if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
@@ -439,14 +445,14 @@ function gameLoop() {
         }
     });
 
-    // 9. クリア演出シークエンス
+    // 9. クリア演出シークエンス（★前進脱出スピードもアップ 5 -> 8）
     if (isEndingSequence) {
         let targetCenterX = canvas.width / 2 - player.width / 2;
         if (Math.abs(player.x - targetCenterX) > 2) {
-            player.x += (player.x < targetCenterX) ? 2 : -2;
+            player.x += (player.x < targetCenterX) ? 4 : -4;
         } else {
             player.x = targetCenterX; 
-            player.y -= 5; 
+            player.y -= 8; 
             if (player.y + player.height < 0) {
                 gameClear = true;
             }
