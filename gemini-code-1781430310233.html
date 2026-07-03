@@ -2,846 +2,137 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIKKE データベース＆画像ビューア（完全復活版）</title>
+    <title>シンプルシューティングゲーム</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f4f6f9;
             margin: 0;
-            padding: 0;
-        }
-        .header {
-            background-color: #ffffff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            padding: 0;
-            margin: 0;
-            width: 100%;
+            background: #111;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: sans-serif;
         }
-        .tabs {
-            display: flex;
-            padding-left: 20px;
+        canvas {
+            border: 4px solid #fff;
+            background: #000;
         }
-        .tab {
-            padding: 16px 28px;
-            color: #64748b;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s ease;
-            background: none;
-            border: none;
-            outline: none;
-        }
-        .tab:hover {
-            color: #1a568a;
-            background-color: #f8fafc;
-        }
-        .tab.active {
-            color: #1a568a;
-            font-weight: 700;
-            background-color: #ffffff;
-        }
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background-color: #1a568a;
-            border-radius: 3px 3px 0 0;
-        }
-        
-        .reset-btn {
-            margin-right: 24px;
-            background-color: #fff;
-            color: #64748b;
-            border: 1px solid #cbd5e1;
-            padding: 6px 12px;
-            font-size: 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .reset-btn:hover {
-            background-color: #fee2e2;
-            color: #ef4444;
-            border-color: #fca5a5;
-        }
-
-        .main-container {
-            padding: 24px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        .title-area {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .dashboard-title {
-            color: #1e293b;
-            border-left: 4px solid #1a568a;
-            padding-left: 12px;
-            font-size: 1.4em;
-            font-weight: 700;
-            margin: 0;
-        }
-        .size-controls {
-            display: flex;
-            gap: 4px;
-            background-color: #e2e8f0;
-            padding: 4px;
-            border-radius: 6px;
-        }
-        .size-btn {
-            background: none;
-            border: none;
-            padding: 6px 12px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #475569;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-        .size-btn.active {
-            background-color: #ffffff;
-            color: #1a568a;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        /* 検索・フィルターエリア */
-        .filter-section {
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
-        .search-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .search-input {
-            flex: 1;
-            min-width: 280px;
-            padding: 10px 14px;
-            border: 1px solid #cbd5e1;
-            font-size: 14px;
-            border-radius: 6px;
-        }
-        .search-input:focus, .date-filter-input:focus {
-            outline: none;
-            border-color: #1a568a;
-            box-shadow: 0 0 0 3px rgba(26, 86, 138, 0.15);
-        }
-        
-        .date-filter-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #475569;
-            font-weight: 600;
-            background: #f8fafc;
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
-        }
-        .date-filter-input {
-            padding: 6px 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            font-size: 13px;
-            font-family: inherit;
-        }
-
-        .fav-filter-btn {
-            background-color: #ffffff;
-            color: #64748b;
-            border: 1px solid #cbd5e1;
-            padding: 9px 14px;
-            font-size: 14px;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .fav-filter-btn.active {
-            background-color: #fef9c3;
-            border-color: #fde047;
-            color: #a16207;
-        }
-
-        /* 星マーク */
-        .star-icon {
-            cursor: pointer;
-            font-size: 18px;
-            color: #cbd5e1;
-            transition: transform 0.1s ease, color 0.2s;
-            user-select: none;
-        }
-        .star-icon.active { color: #f59e0b; }
-        .star-icon:hover { transform: scale(1.2); }
-
-        /* 1. キャラクター一覧（ギャラリー形式） */
-        .gallery-grid {
-            display: grid;
-            justify-content: start;
-            gap: 24px;
-            width: 100%;
-        }
-        
-        .gallery-grid.size-small { grid-template-columns: repeat(auto-fill, minmax(170px, 170px)); gap: 16px; }
-        .gallery-grid.size-small img { height: 110px; }
-        .gallery-grid.size-small .grid-title { font-size: 12px; margin-bottom: 4px; }
-        .gallery-grid.size-small .grid-meta { font-size: 11px; display: none; }
-        .gallery-grid.size-small .grid-card-body { padding: 10px; }
-
-        .gallery-grid.size-medium { grid-template-columns: repeat(auto-fill, minmax(250px, 250px)); }
-        .gallery-grid.size-medium img { height: 160px; }
-
-        .gallery-grid.size-large { grid-template-columns: repeat(auto-fill, minmax(380px, 380px)); gap: 32px; }
-        .gallery-grid.size-large img { height: 230px; }
-        .gallery-grid.size-large .grid-title { font-size: 16px; margin-bottom: 8px; }
-        .gallery-grid.size-large .grid-meta { font-size: 13px; margin-bottom: 4px; }
-
-        .grid-card {
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-            border: 1px solid #e2e8f0;
-            transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
-        }
-        .grid-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        }
-        .grid-card img {
-            width: 100%;
-            object-fit: cover;
-            display: block;
-            cursor: pointer;
-        }
-        .grid-card-body { padding: 14px; position: relative; }
-        .grid-card .star-position { position: absolute; right: 12px; bottom: 12px; font-size: 20px; }
-        .grid-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; color: #1e293b; padding-right: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .grid-meta { font-size: 12px; color: #64748b; margin-bottom: 3px; }
-        .grid-pu-badge { font-size: 11px; background-color: #ffedd5; color: #ea580c; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; font-weight: 600; }
-
-        /* 2. リスト形式（テーブル） */
-        .table-wrapper {
-            width: 100%; overflow-x: auto; background-color: #ffffff; border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;
-        }
-        .business-card-table { width: 100%; border-collapse: collapse; }
-        .business-card-table th {
-            text-align: left; padding: 14px; background-color: #f8fafc; color: #475569;
-            border-bottom: 2px solid #e2e8f0; white-space: nowrap; font-size: 13px; font-weight: 600;
-        }
-        .business-card-table td { text-align: left; padding: 14px; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 14px; vertical-align: top; }
-        .business-card-table tr:hover td { background-color: #f8fafc; }
-        .list-preview-img { width: 110px; height: 65px; object-fit: cover; border: 1px solid #e2e8f0; border-radius: 4px; display: block; cursor: pointer; }
-        .list-skills-preview { font-size: 11px; color: #64748b; max-width: 300px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-
-        /* 3. 新規登録・編集画面共通 */
-        .upload-container { background-color: #ffffff; border-radius: 8px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); max-width: 700px; margin: 0 auto; }
-        .drop-zone { border: 3px dashed #cbd5e1; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; background-color: #f8fafc; transition: all 0.2s; }
-        .drop-zone:hover, .drop-zone.dragover { border-color: #1a568a; background-color: #f0f7ff; }
-        .drop-zone-text { color: #475569; font-weight: 600; margin-bottom: 6px; }
-        .drop-zone-subtext { color: #94a3b8; font-size: 12px; }
-        
-        .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media(max-width: 600px){ .form-grid-2 { grid-template-columns: 1fr; } }
-        
-        .upload-form { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
-        .preview-box { text-align: center; margin-top: 16px; }
-        .preview-box img { max-width: 100%; max-height: 180px; border-radius: 6px; border: 1px solid #cbd5e1; }
-
-        /* ポップアップ詳細 */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
-        .modal-content { background-color: #ffffff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); width: 95%; max-width: 900px; max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; }
-        .modal-header { padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #f8fafc; }
-        .modal-title { font-size: 16px; font-weight: 700; color: #1e293b; }
-        .modal-close-btn { background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer; }
-        .modal-body { padding: 24px; display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px; }
-        @media (max-width: 768px) { .modal-body { grid-template-columns: 1fr; } }
-        .modal-img-container { width: 100%; display: flex; justify-content: center; align-items: flex-start; position: sticky; top: 0; }
-        .modal-preview-img { width: 100%; max-height: 450px; object-fit: contain; border-radius: 6px; border: 1px solid #cbd5e1; }
-        .edit-form { display: flex; flex-direction: column; gap: 14px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-size: 13px; font-weight: 600; color: #475569; }
-        .form-control { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-family: inherit; }
-        .form-control:focus { outline: none; border-color: #1a568a; }
-        textarea.form-control { resize: vertical; min-height: 54px; font-size: 13px; }
-        
-        .modal-footer { padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; background-color: #f8fafc; }
-        .btn-secondary { background-color: #fff; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .btn-primary { background-color: #1a568a; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .btn-primary:hover { background-color: #13426b; }
-
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div class="tabs">
-            <div class="tab active" id="tab-grid-btn" onclick="switchTab('grid')">1. キャラクター一覧</div>
-            <div class="tab tab-inactive" id="tab-list-btn" onclick="switchTab('list')">2. ニケ実装詳細情報</div>
-            <div class="tab tab-inactive" id="tab-upload-btn" onclick="switchTab('upload')">3. 新規図鑑登録</div>
-        </div>
-        <button class="reset-btn" onclick="resetToDefault()">全データを初期リストに戻す</button>
-    </div>
+<canvas id="gameCanvas" width="400" height="500"></canvas>
 
-    <div class="main-container">
-        <div class="title-area">
-            <div class="dashboard-title" id="page-title">■ キャラクター一覧（ギャラリービュー）</div>
-            
-            <div class="size-controls" id="gallery-size-controls">
-                <button class="size-btn" id="size-s" onclick="changeGridSize('small')">小</button>
-                <button class="size-btn active" id="size-m" onclick="changeGridSize('medium')">中</button>
-                <button class="size-btn" id="size-l" onclick="changeGridSize('large')">大</button>
-            </div>
-        </div>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-        <div class="filter-section" id="common-filter-section">
-            <div class="search-row">
-                <input type="text" id="search-input" class="search-input" placeholder="名前、部隊名、スキル、ファイル名で検索（部分一致）…" onkeyup="filterImages()">
+// --- ゲームの設定 ---
+let player = { x: 180, y: 450, width: 40, height: 20, speed: 5 };
+let bullets = [];
+let enemies = [];
+let score = 0;
+let gameOver = false;
+
+// キーボードの入力状態を管理
+let keys = {};
+window.addEventListener("keydown", (e) => keys[e.key] = true);
+window.addEventListener("keyup", (e) => keys[e.key] = false);
+
+// 弾を発射する間隔を制限するタイマー
+let shotTimer = 0;
+
+// --- ゲームループ ---
+function gameLoop() {
+    if (gameOver) {
+        ctx.fillStyle = "white";
+        ctx.font = "30px sans-serif";
+        ctx.fillText("GAME OVER", 110, 250);
+        ctx.font = "20px sans-serif";
+        ctx.fillText("リロードして再挑戦", 120, 290);
+        return;
+    }
+
+    // 1. 画面をクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 2. 自機の移動
+    if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
+    if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += player.speed;
+
+    // 3. 弾の発射（スペースキー）
+    if (keys[" "] && shotTimer === 0) {
+        bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 10 });
+        shotTimer = 10; // 連続発射のウェイト
+    }
+    if (shotTimer > 0) shotTimer--;
+
+    // 4. 敵の自動生成
+    if (Math.random() < 0.02) { // 約2%の確率で毎フレーム敵を生成
+        enemies.push({ x: Math.random() * (canvas.width - 30), y: 0, width: 30, height: 30, speed: 2 });
+    }
+
+    // 5. 弾の移動と描画
+    ctx.fillStyle = "yellow";
+    bullets.forEach((bullet, bIndex) => {
+        bullet.y -= 7; // 上に移動
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+        
+        // 画面外に出た弾を削除
+        if (bullet.y < 0) bullets.splice(bIndex, 1);
+    });
+
+    // 6. 敵の移動と描画
+    ctx.fillStyle = "red";
+    enemies.forEach((enemy, eIndex) => {
+        enemy.y += enemy.speed; // 下に移動
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+
+        // 自機と敵の衝突判定
+        if (enemy.x < player.x + player.width &&
+            enemy.x + enemy.width > player.x &&
+            enemy.y < player.y + player.height &&
+            enemy.y + enemy.height > player.y) {
+            gameOver = true;
+        }
+
+        // 画面外に出た敵を削除
+        if (enemy.y > canvas.height) enemies.splice(eIndex, 1);
+    });
+
+    // 7. 弾と敵の当たり判定
+    bullets.forEach((bullet, bIndex) => {
+        enemies.forEach((enemy, eIndex) => {
+            if (bullet.x < enemy.x + enemy.width &&
+                bullet.x + bullet.width > enemy.x &&
+                bullet.y < enemy.y + enemy.height &&
+                bullet.y + bullet.height > enemy.y) {
                 
-                <div class="date-filter-group">
-                    <span>📅 実装日範囲:</span>
-                    <input type="date" id="filter-start-date" class="date-filter-input" onchange="filterImages()">
-                    <span>～</span>
-                    <input type="date" id="filter-end-date" class="date-filter-input" onchange="filterImages()">
-                    <button style="border:none; background:#e2e8f0; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="clearDateFilter()">クリア</button>
-                </div>
-
-                <button class="fav-filter-btn" id="fav-filter-btn" onclick="toggleFavFilter()">
-                    <span class="star-icon active">★</span> お気に入りのみ
-                </button>
-            </div>
-        </div>
-
-        <div id="view-grid">
-            <div class="gallery-grid size-medium" id="grid-body"></div>
-        </div>
-
-        <div id="view-list" class="table-wrapper hidden">
-            <table class="business-card-table">
-                <thead>
-                    <tr>
-                        <th>お気に入り</th>
-                        <th>画像</th>
-                        <th>名前 (氏名 / ファイル名)</th>
-                        <th>所属部隊 / 企業</th>
-                        <th>実装日</th>
-                        <th>PU期間</th>
-                        <th>スキル概要メモ（1 / 2 / バースト）</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body"></tbody>
-            </table>
-        </div>
-
-        <div id="view-upload" class="hidden">
-            <div class="upload-container">
-                <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-                    <div class="drop-zone-text">ここにスクショ画像をドラッグ＆ドロップ</div>
-                    <div class="drop-zone-subtext">または、ここをクリックしてファイルを選択</div>
-                    <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleFileSelect(this.files)">
-                </div>
-                
-                <div id="upload-preview-area" class="preview-box hidden">
-                    <img id="upload-img-preview" src="" alt="">
-                </div>
-
-                <div class="upload-form">
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="new-name">名前 (キャラクター名) *</label>
-                            <input type="text" id="new-name" class="form-control" placeholder="例: レッドフード">
-                        </div>
-                        <div class="form-group">
-                            <label for="new-company">所属部隊 / 企業・グループ</label>
-                            <input type="text" id="new-company" class="form-control" placeholder="例: ピルグリム / ゴッデス部隊">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="new-date">実装日 (カレンダー指定)</label>
-                        <input type="date" id="new-date" class="form-control">
-                    </div>
-
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="new-pu-start">ピックアップ開始日</label>
-                            <input type="date" id="new-pu-start" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="new-pu-end">ピックアップ終了日</label>
-                            <input type="date" id="new-pu-end" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="new-skill1">スキル1 (200文字程度)</label>
-                        <textarea id="new-skill1" class="form-control" maxlength="250" placeholder="効果や運用メモなど"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="new-skill2">スキル2 (200文字程度)</label>
-                        <textarea id="new-skill2" class="form-control" maxlength="250" placeholder="効果や運用メモなど"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="new-skill3">バーストスキル (200文字程度)</label>
-                        <textarea id="new-skill3" class="form-control" maxlength="250" placeholder="効果や運用メモなど"></textarea>
-                    </div>
-
-                    <button class="btn-primary" style="padding:12px; font-size:15px;" onclick="addNewCharacter()">ニケを図鑑に新規登録する</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="edit-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">ニケ詳細データベース情報・編集</div>
-                <button class="modal-close-btn" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="modal-img-container">
-                    <img id="modal-img-preview" class="modal-preview-img" src="" alt="">
-                </div>
-                <div class="edit-form">
-                    <input type="hidden" id="edit-index">
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="edit-name">名前 (キャラクター名)</label>
-                            <input type="text" id="edit-name" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-company">所属部隊 / 企業</label>
-                            <input type="text" id="edit-company" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit-date">実装日</label>
-                        <input type="date" id="edit-date" class="form-control">
-                    </div>
-
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label for="edit-pu-start">PU開始日</label>
-                            <input type="date" id="edit-pu-start" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-pu-end">PU終了日</label>
-                            <input type="date" id="edit-pu-end" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit-skill1">スキル1</label>
-                        <textarea id="edit-skill1" class="form-control" maxlength="250"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-skill2">スキル2</label>
-                        <textarea id="edit-skill2" class="form-control" maxlength="250"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-skill3">バーストスキル</label>
-                        <textarea id="edit-skill3" class="form-control" maxlength="250"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" style="margin-right:auto; color:#ef4444; border-color:#fca5a5;" onclick="deleteCharacter()">データを削除</button>
-                <button class="btn-secondary" onclick="closeModal()">キャンセル</button>
-                <button class="btn-primary" onclick="saveData()">変更を保存</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // フォルダ内の全画像ファイル名リスト（完全復活）
-        const rawImageNames = [
-            "HGLmse8aAAANV2C.jpg", "HGLsYIDasAAcnhL.jpg", "HGLwUaAbAAAo-vC.jpg",
-            "IMG_0421.JPG", "IMG_0422.JPG", "IMG_0423.JPG", "IMG_0424.JPG", "IMG_0425.JPG",
-            "IMG_0426.JPG", "IMG_0427.JPG", "IMG_0428.JPG", "IMG_0429.JPG", "IMG_0430.JPG",
-            "IMG_0431.JPG", "IMG_0432.JPG", "IMG_0433.JPG", "IMG_0434.JPG", "IMG_0435.JPG",
-            "IMG_0436.JPG", "IMG_0441.JPG", "IMG_0445.JPG", "sub1-30.jpg", "nm1.png", "nm3.png"
-        ];
-
-        // ファイル名から拡張子等を除いた綺麗めの初期名を作る
-        function getCleanName(filename) {
-            return filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-        }
-
-        // 初期画像リストをシステム用データ構造に変換
-        const defaultData = rawImageNames.map(name => ({
-            src: name,
-            name: getCleanName(name),
-            company: "",
-            date: "",
-            puStart: "",
-            puEnd: "",
-            skill1: "",
-            skill2: "",
-            skill3: "",
-            favorite: false
-        }));
-
-        // ブラウザ保存領域にデータがあればそれを使う、無ければ上記全リストを使う
-        let imageData = JSON.parse(localStorage.getItem('nikke_advanced_db_v2')) || defaultData;
-        let isFavFilterActive = false;
-        let currentUploadedSrc = "";
-
-        const tableBody = document.getElementById('table-body');
-        const gridBody = document.getElementById('grid-body');
-
-        function formatDateStr(dateStr) {
-            if(!dateStr) return "---";
-            return dateStr.replace(/-/g, '/');
-        }
-
-        // 描画メインロジック
-        function renderElements() {
-            tableBody.innerHTML = "";
-            gridBody.innerHTML = "";
-
-            imageData.forEach((data, index) => {
-                const favClass = data.favorite ? "active" : "";
-                const isFavValue = data.favorite ? "yes" : "no";
-                const searchKeywords = `${data.name} ${data.company} ${data.src} ${data.skill1} ${data.skill2} ${data.skill3}`.toLowerCase();
-
-                // 1. キャラクターギャラリーカード
-                const card = document.createElement('div');
-                card.className = 'grid-card';
-                card.setAttribute('data-keywords', searchKeywords);
-                card.setAttribute('data-favorite', isFavValue);
-                card.setAttribute('data-date', data.date || "");
-
-                const gImg = document.createElement('img');
-                gImg.src = data.src;
-                gImg.alt = data.name;
-                gImg.onerror = () => { gImg.src = 'https://via.placeholder.com/250x160?text=No+Image'; };
-                gImg.onclick = () => { openModal(index); };
-
-                const cardBody = document.createElement('div');
-                cardBody.className = 'grid-card-body';
-
-                const gTitle = document.createElement('div');
-                gTitle.className = 'grid-title';
-                gTitle.textContent = data.name || "未設定";
-
-                const gMeta1 = document.createElement('div');
-                gMeta1.className = 'grid-meta';
-                gMeta1.textContent = data.company || "部隊・企業 未設定";
-
-                const gMeta2 = document.createElement('div');
-                gMeta2.className = 'grid-meta';
-                gMeta2.style.color = '#475569';
-                gMeta2.innerHTML = `📅 実装: ${formatDateStr(data.date)}`;
-
-                cardBody.appendChild(gTitle);
-                cardBody.appendChild(gMeta1);
-                cardBody.appendChild(gMeta2);
-
-                if(data.puStart || data.puEnd) {
-                    const gPu = document.createElement('div');
-                    gPu.className = 'grid-pu-badge';
-                    gPu.textContent = `PU: ${data.puStart ? data.puStart.substring(5) : '??'} ～ ${data.puEnd ? data.puEnd.substring(5) : '??'}`;
-                    cardBody.appendChild(gPu);
-                }
-
-                const gStar = document.createElement('span');
-                gStar.className = `star-icon star-position ${favClass}`;
-                gStar.innerHTML = data.favorite ? '★' : '☆';
-                gStar.onclick = (e) => { e.stopPropagation(); toggleFavorite(index); };
-
-                cardBody.appendChild(gStar);
-                card.appendChild(gImg);
-                card.appendChild(cardBody);
-                gridBody.appendChild(card);
-
-                // 2. 実装詳細情報（テーブル行）
-                const tr = document.createElement('tr');
-                tr.setAttribute('data-keywords', searchKeywords);
-                tr.setAttribute('data-favorite', isFavValue);
-                tr.setAttribute('data-date', data.date || "");
-
-                const tdFav = document.createElement('td');
-                tdFav.style.textAlign = 'center';
-                const lStar = document.createElement('span');
-                lStar.className = `star-icon ${favClass}`;
-                lStar.innerHTML = data.favorite ? '★' : '☆';
-                lStar.onclick = () => { toggleFavorite(index); };
-                tdFav.appendChild(lStar);
-
-                const tdImg = document.createElement('td');
-                const imgEl = document.createElement('img');
-                imgEl.src = data.src;
-                imgEl.className = 'list-preview-img';
-                imgEl.onerror = () => { imgEl.src = 'https://via.placeholder.com/110x65?text=No+Image'; };
-                imgEl.onclick = () => { openModal(index); };
-                tdImg.appendChild(imgEl);
-
-                const tdName = document.createElement('td');
-                tdName.innerHTML = `<strong>${data.name || '未入力'}</strong><br><span style="font-size:11px; color:#94a3b8;">${data.src}</span>`;
-
-                const tdCompany = document.createElement('td');
-                tdCompany.textContent = data.company || "---";
-
-                const tdDate = document.createElement('td');
-                tdDate.textContent = formatDateStr(data.date);
-
-                const tdPu = document.createElement('td');
-                tdPu.style.fontSize = '12px';
-                if(data.puStart || data.puEnd) {
-                    tdPu.innerHTML = `${formatDateStr(data.puStart)}<br>～ ${formatDateStr(data.puEnd)}`;
-                } else {
-                    tdPu.textContent = "---";
-                }
-
-                const tdSkills = document.createElement('td');
-                tdSkills.className = 'list-skills-preview';
-                tdSkills.innerHTML = `
-                    <strong>【S1】</strong>${data.skill1 || '未登録'}<br>
-                    <strong>【S2】</strong>${data.skill2 || '未登録'}<br>
-                    <strong>【バースト】</strong>${data.skill3 || '未登録'}
-                `;
-
-                tr.appendChild(tdFav);
-                tr.appendChild(tdImg);
-                tr.appendChild(tdName);
-                tr.appendChild(tdCompany);
-                tr.appendChild(tdDate);
-                tr.appendChild(tdPu);
-                tr.appendChild(tdSkills);
-                tableBody.appendChild(tr);
-            });
-
-            filterImages();
-        }
-
-        function toggleFavorite(index) {
-            imageData[index].favorite = !imageData[index].favorite;
-            localStorage.setItem('nikke_advanced_db_v2', JSON.stringify(imageData));
-            renderElements();
-        }
-
-        function toggleFavFilter() {
-            isFavFilterActive = !isFavFilterActive;
-            document.getElementById('fav-filter-btn').classList.toggle('active', isFavFilterActive);
-            filterImages();
-        }
-
-        function changeGridSize(size) {
-            gridBody.className = `gallery-grid size-${size}`;
-            document.getElementById('size-s').classList.toggle('active', size === 'small');
-            document.getElementById('size-m').classList.toggle('active', size === 'medium');
-            document.getElementById('size-l').classList.toggle('active', size === 'large');
-        }
-
-        function handleFileSelect(files) {
-            if (files.length === 0) return;
-            const file = files[0];
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                currentUploadedSrc = e.target.result;
-                document.getElementById('upload-img-preview').src = currentUploadedSrc;
-                document.getElementById('upload-preview-area').classList.remove('hidden');
-                document.getElementById('new-name').value = file.name.replace(/\.[^/.]+$/, "");
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function addNewCharacter() {
-            const name = document.getElementById('new-name').value.trim();
-            const company = document.getElementById('new-company').value.trim();
-            const date = document.getElementById('new-date').value;
-            const puStart = document.getElementById('new-pu-start').value;
-            const puEnd = document.getElementById('new-pu-end').value;
-            const skill1 = document.getElementById('new-skill1').value.trim();
-            const skill2 = document.getElementById('new-skill2').value.trim();
-            const skill3 = document.getElementById('new-skill3').value.trim();
-
-            if (!currentUploadedSrc) { alert('スクショ画像ファイルをドロップまたは選択してください。'); return; }
-            if (!name) { alert('名前を入力してください。'); return; }
-
-            imageData.unshift({
-                src: currentUploadedSrc,
-                name, company, date, puStart, puEnd, skill1, skill2, skill3,
-                favorite: false
-            });
-
-            localStorage.setItem('nikke_advanced_db_v2', JSON.stringify(imageData));
-
-            document.getElementById('new-name').value = "";
-            document.getElementById('new-company').value = "";
-            document.getElementById('new-date').value = "";
-            document.getElementById('new-pu-start').value = "";
-            document.getElementById('new-pu-end').value = "";
-            document.getElementById('new-skill1').value = "";
-            document.getElementById('new-skill2').value = "";
-            document.getElementById('new-skill3').value = "";
-            document.getElementById('upload-preview-area').classList.add('hidden');
-            currentUploadedSrc = "";
-
-            alert('新しいデータを登録しました！');
-            switchTab('grid');
-            renderElements();
-        }
-
-        function openModal(index) {
-            const data = imageData[index];
-            document.getElementById('edit-index').value = index;
-            document.getElementById('modal-img-preview').src = data.src;
-            document.getElementById('modal-img-preview').onerror = () => { document.getElementById('modal-img-preview').src = 'https://via.placeholder.com/450x300?text=No+Image'; };
-
-            document.getElementById('edit-name').value = data.name || "";
-            document.getElementById('edit-company').value = data.company || "";
-            document.getElementById('edit-date').value = data.date || "";
-            document.getElementById('edit-pu-start').value = data.puStart || "";
-            document.getElementById('edit-pu-end').value = data.puEnd || "";
-            document.getElementById('edit-skill1').value = data.skill1 || "";
-            document.getElementById('edit-skill2').value = data.skill2 || "";
-            document.getElementById('edit-skill3').value = data.skill3 || "";
-
-            document.getElementById('edit-modal').classList.remove('hidden');
-        }
-
-        function closeModal() { document.getElementById('edit-modal').classList.add('hidden'); }
-
-        function saveData() {
-            const index = document.getElementById('edit-index').value;
-            imageData[index].name = document.getElementById('edit-name').value;
-            imageData[index].company = document.getElementById('edit-company').value;
-            imageData[index].date = document.getElementById('edit-date').value;
-            imageData[index].puStart = document.getElementById('edit-pu-start').value;
-            imageData[index].puEnd = document.getElementById('edit-pu-end').value;
-            imageData[index].skill1 = document.getElementById('edit-skill1').value;
-            imageData[index].skill2 = document.getElementById('edit-skill2').value;
-            imageData[index].skill3 = document.getElementById('edit-skill3').value;
-
-            localStorage.setItem('nikke_advanced_db_v2', JSON.stringify(imageData));
-            closeModal();
-            renderElements();
-        }
-
-        function deleteCharacter() {
-            const index = document.getElementById('edit-index').value;
-            if(confirm('このデータを図鑑から削除しますか？')) {
-                imageData.splice(index, 1);
-                localStorage.setItem('nikke_advanced_db_v2', JSON.stringify(imageData));
-                closeModal();
-                renderElements();
+                // 当たったら両方消す
+                bullets.splice(bIndex, 1);
+                enemies.splice(eIndex, 1);
+                score += 100;
             }
-        }
+        });
+    });
 
-        function clearDateFilter() {
-            document.getElementById('filter-start-date').value = "";
-            document.getElementById('filter-end-date').value = "";
-            filterImages();
-        }
+    // 8. 自機の描画
+    ctx.fillStyle = "cyan";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
 
-        // 検索・絞り込みロジック
-        function filterImages() {
-            const query = document.getElementById('search-input').value.toLowerCase().trim();
-            const startDate = document.getElementById('filter-start-date').value;
-            const endDate = document.getElementById('filter-end-date').value;
+    // 9. スコアの描画
+    ctx.fillStyle = "white";
+    ctx.font = "16px sans-serif";
+    ctx.fillText("SCORE: " + score, 10, 25);
 
-            const filterLogic = (el) => {
-                const keywords = el.getAttribute('data-keywords');
-                const isFav = el.getAttribute('data-favorite');
-                const elDate = el.getAttribute('data-date');
+    // 次のフレームを要請
+    requestAnimationFrame(gameLoop);
+}
 
-                const matchesQuery = keywords.includes(query);
-                const matchesFav = !isFavFilterActive || isFav === 'yes';
-                
-                let matchesDate = true;
-                if (elDate) {
-                    if (startDate && elDate < startDate) matchesDate = false;
-                    if (endDate && elDate > endDate) matchesDate = false;
-                } else if (startDate || endDate) {
-                    matchesDate = false; // 期間フィルター中なのに日付が無いキャラは非表示
-                }
+// ゲームスタート
+gameLoop();
+</script>
 
-                if (matchesQuery && matchesFav && matchesDate) {
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            };
-
-            Array.from(tableBody.getElementsByTagName('tr')).forEach(filterLogic);
-            Array.from(gridBody.getElementsByClassName('grid-card')).forEach(filterLogic);
-        }
-
-        function switchTab(mode) {
-            document.getElementById('view-grid').classList.add('hidden');
-            document.getElementById('view-list').classList.add('hidden');
-            document.getElementById('view-upload').classList.add('hidden');
-            document.getElementById('gallery-size-controls').classList.add('hidden');
-            document.getElementById('common-filter-section').classList.add('hidden');
-            
-            document.getElementById('tab-grid-btn').className = 'tab tab-inactive';
-            document.getElementById('tab-list-btn').className = 'tab tab-inactive';
-            document.getElementById('tab-upload-btn').className = 'tab tab-inactive';
-
-            if (mode === 'grid') {
-                document.getElementById('tab-grid-btn').className = 'tab active';
-                document.getElementById('view-grid').classList.remove('hidden');
-                document.getElementById('gallery-size-controls').classList.remove('hidden');
-                document.getElementById('common-filter-section').classList.remove('hidden');
-                document.getElementById('page-title').textContent = '■ キャラクター一覧（ギャラリービュー）';
-            } else if (mode === 'list') {
-                document.getElementById('tab-list-btn').className = 'tab active';
-                document.getElementById('view-list').classList.remove('hidden');
-                document.getElementById('common-filter-section').classList.remove('hidden');
-                document.getElementById('page-title').textContent = '■ ニケ実装詳細情報';
-            } else if (mode === 'upload') {
-                document.getElementById('tab-upload-btn').className = 'tab active';
-                document.getElementById('view-upload').classList.remove('hidden');
-                document.getElementById('page-title').textContent = '■ 新しいニケの登録';
-            }
-        }
-
-        function resetToDefault() {
-            if(confirm('編集やお気に入りをすべて初期化し、最初の全画像リストに戻しますか？')) {
-                localStorage.removeItem('nikke_advanced_db_v2');
-                imageData = JSON.parse(JSON.stringify(defaultData));
-                renderElements();
-            }
-        }
-
-        const dropZone = document.getElementById('drop-zone');
-        ['dragenter', 'dragover'].forEach(name => dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }));
-        ['dragleave', 'drop'].forEach(name => dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
-        dropZone.addEventListener('drop', (e) => { handleFileSelect(e.dataTransfer.files); });
-
-        renderElements();
-    </script>
 </body>
 </html>
