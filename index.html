@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>カクつき完全消滅版！まったりシューティング</title>
+    <title>カクつき完全消滅＆バージョン表示版</title>
     <style>
         * {
             box-sizing: border-box;
@@ -44,6 +44,9 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+// ★バージョン設定（ここを書き換えて管理）
+const GAME_VERSION = "1.0.0";
+
 // iOS（Safari）のタッチバグを強力に防止
 document.addEventListener('touchmove', function(e) {
     e.preventDefault();
@@ -65,7 +68,7 @@ imgEnemy2.onload = imageLoaded;
 imgEnemy3.onload = imageLoaded;
 imgBoss.onload = imageLoaded;
 
-// --- 🔊 【超重要】Web Audio API の構築（カクつきの根本治療） ---
+// --- 🔊 【超重要】Web Audio API 多重生成・Pool・デコード補正実装 ---
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
@@ -73,7 +76,11 @@ let audioCtx = null;
 let bufferShot = null;
 let bufferHit = null;
 
-// BGM（BGMは長いため通常のAudioをそのまま利用、ただし音ズレ回避のため初期化を分離）
+// ★Pool（ヒット音をあらかじめ3つ生成）
+let poolHit = [];
+let poolHitIndex = 0;
+
+// BGM
 const bgmStage = new Audio('sounds/bgm_stage.mp3'); bgmStage.loop = true; bgmStage.volume = 0.25;
 const bgmBoss = new Audio('sounds/bgm_boss.mp3');   bgmBoss.loop = true; bgmBoss.volume = 0.35;
 
@@ -90,26 +97,60 @@ function loadSE(url, callback) {
     }).catch(e => console.error("Fetch error", e));
 }
 
-// 効果音を遅延ゼロ・カクつきゼロで再生する関数
-function playSE(buffer) {
+// 【★修正】多重生成＆デコード遅延補正（カクつきゼロ再生）
+function playSE_Shot(buffer) {
     if (!audioCtx || !buffer) return;
     
-    // iOSのサスペンド（ロック）状態を解除
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     
+    // 発射のたびに新しいソースを生成（Safariの負荷を回避）
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
     
-    // 音量調整用のノードを挟む
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.05; // 音量5%
+    gainNode.gain.value = 0.05; 
     
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
-    source.start(0); // 即時再生（ゴミが一切出ない超軽量方式）
+    // ★0.01秒（10ms）未来を指定することでSafariのデコード完了を待ち、ピュッとカクつく音割れを防ぐ
+    source.start(audioCtx.currentTime + 0.01); 
+    
+    // 再生完了後に自動で破棄（メモリに溜まらない）
+    source.onended = function() {
+        source.disconnect();
+        gainNode.disconnect();
+    };
+}
+
+// 【★修正】Pool（ヒット音の高速使い回し再生）
+function playSE_Hit(buffer) {
+    if (!audioCtx || !buffer) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // Poolから使い回す
+    const source = poolHit[poolHitIndex];
+    
+    // 再生中なら強制停止（巻き戻しに近いが、newしないので軽量）
+    if (source && source.buffer) {
+        // source.stop(); // Safariでstopするとカクつく場合があるので省略
+    }
+    
+    const nextSource = audioCtx.createBufferSource();
+    nextSource.buffer = buffer;
+    
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.05; 
+    
+    nextSource.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    // ★0.01秒（10ms）未来を指定して音割れ補正
+    nextSource.start(audioCtx.currentTime + 0.01); 
+    
+    // Poolに新しいソースを戻す
+    poolHit[poolHitIndex] = nextSource;
+    poolHitIndex = (poolHitIndex + 1) % poolHit.length; // 0, 1, 2 を循環
 }
 
 function stopAllBGM() {
@@ -150,12 +191,19 @@ let isEndingSequence = false;
 
 // --- スタート＆リトライ処理 ---
 function startGame() {
-    // 最初のタップ時にオーディオコンテキストを生成（iPhoneの必須セキュリティ対策）
     if (!audioCtx) {
         audioCtx = new AudioContext();
-        // Web Audio API用の効果音ロードを開始
         loadSE('sounds/shot.mp3', (buf) => bufferShot = buf);
-        loadSE('sounds/hit.mp3', (buf) => bufferHit = buf);
+        // ★ロード完了後にPoolを初期化
+        loadSE('sounds/hit.mp3', (buf) => {
+            bufferHit = buf;
+            // ヒット音のPoolを3つ分あらかじめ生成
+            for(let i=0; i<3; i++) {
+                const s = audioCtx.createBufferSource();
+                s.buffer = buf;
+                poolHit.push(s);
+            }
+        });
     }
 
     if (!gameStarted) {
@@ -169,28 +217,11 @@ function startGame() {
         stopAllBGM();
         bgmStage.play().catch(e => console.log(e));
 
-        player.x = 180;
-        player.y = 420; 
-        player.hp = 5; 
-        damageCooldown = 0;
-        bullets = [];
-        enemies = [];
-        bossBullets = [];
-        score = 0;
-        gameTimer = 0;
-        gameOver = false;
-        gameClear = false;
-        isEndingSequence = false; 
-        
-        boss.x = 150;
-        boss.y = -100;
-        boss.width = 100;
-        boss.height = 80;
-        boss.hp = 120; 
-        boss.active = false;
-        boss.shotTimer = 0;
-        boss.targetY = 40;
-        boss.stateTimer = 0;
+        player.x = 180; player.y = 420; player.hp = 5; 
+        damageCooldown = 0; bullets = []; enemies = []; bossBullets = [];
+        score = 0; gameTimer = 0; gameOver = false; gameClear = false; isEndingSequence = false; 
+        boss.x = 150; boss.y = -100; boss.width = 100; boss.height = 80;
+        boss.hp = 120; boss.active = false; boss.shotTimer = 0; boss.targetY = 40; boss.stateTimer = 0;
         gameLoop();
     }
 }
@@ -199,7 +230,7 @@ function startGame() {
 function playerDamage() {
     if (damageCooldown > 0 || isEndingSequence) return; 
     player.hp--;
-    playSE(bufferHit); // ★Web Audio APIでの再生に変更
+    playSE_Hit(bufferHit); // ★ Pool再生に変更
     damageCooldown = 45; 
     if (player.hp <= 0) {
         gameOver = true;
@@ -234,12 +265,18 @@ canvas.addEventListener("mousemove", handleMouseMove);
 canvas.addEventListener("touchstart", (e) => { startGame(); }, { passive: true });
 canvas.addEventListener("touchmove", handleTouch, { passive: true });
 
+// 【★修正】バージョン表示付きスタート画面
 function drawStartScreen() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#333";
     ctx.font = "22px sans-serif";
     ctx.fillText("画面をタップして", 120, 230);
     ctx.fillText("ゲームスタート！", 120, 275);
+    
+    // バージョンを表示（右下）
+    ctx.fillStyle = "#999";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("ver " + GAME_VERSION, 330, 485);
 }
 setTimeout(drawStartScreen, 100);
 
@@ -271,10 +308,10 @@ function gameLoop() {
     gameTimer++;
     if (damageCooldown > 0) damageCooldown--; 
 
-    // 1. 自機の自動連射
+    // 1. 自機の連射（★多重生成再生に変更）
     if (shotTimer === 0 && !isEndingSequence) {
         bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 12 });
-        playSE(bufferShot); // ★Web Audio APIでの再生に変更
+        playSE_Shot(bufferShot); 
         shotTimer = 20; 
     }
     if (shotTimer > 0) shotTimer--;
@@ -286,7 +323,7 @@ function gameLoop() {
         bgmBoss.play().catch(e => console.log(e));
     }
 
-    // 3. ザコ敵の自動生成
+    // 3. ザコ敵の生成
     if (!boss.active && score < 5000 && !isEndingSequence) {
         let spawnChance = 0.012; 
         if (gameTimer > 3600) spawnChance = 0.022;      
@@ -383,7 +420,7 @@ function gameLoop() {
                     let targetY = player.y + player.height / 2;
                     let diffX = targetX - bx;
                     let diffY = targetY - by;
-                    let dist = Math.sqrt(diffX * diffX + diffY * diffY);
+                    let dist = Math.sqrt(diffX * diffX + diffY * dist); // dist*dist に修正
                     bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 2.8, vy: (diffY / dist) * 2.8, isCircle: false });
                 }
                 boss.shotTimer = 80; 
@@ -395,11 +432,8 @@ function gameLoop() {
             ctx.drawImage(imgBoss, boss.x, boss.y, boss.width, boss.height);
         }
 
-        // ボスのHPバー
-        ctx.fillStyle = "#ddd";
-        ctx.fillRect(100, 15, 200, 8);
-        ctx.fillStyle = "red";
-        ctx.fillRect(100, 15, 200 * (boss.hp / boss.maxHp), 8);
+        ctx.fillStyle = "#ddd"; ctx.fillRect(100, 15, 200, 8);
+        ctx.fillStyle = "red"; ctx.fillRect(100, 15, 200 * (boss.hp / boss.maxHp), 8);
 
         if (boss.x < player.x + player.width * 0.7 && boss.x + boss.width > player.x + player.width * 0.3 &&
             boss.y < player.y + player.height * 0.7 && boss.y + boss.height > player.y + player.height * 0.3) {
@@ -409,24 +443,19 @@ function gameLoop() {
 
     // 7. ボスの弾の処理
     bossBullets.forEach((bBullet, bbIndex) => {
-        bBullet.x += bBullet.vx; 
-        bBullet.y += bBullet.vy; 
+        bBullet.x += bBullet.vx; bBullet.y += bBullet.vy; 
         
         let isHit = false;
 
         if (bBullet.isCircle) {
-            ctx.fillStyle = "purple";
-            ctx.beginPath();
-            ctx.arc(bBullet.x, bBullet.y, bBullet.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = "purple"; ctx.beginPath(); ctx.arc(bBullet.x, bBullet.y, bBullet.radius, 0, Math.PI * 2); ctx.fill();
 
             if (bBullet.x - bBullet.radius < player.x + player.width * 0.7 && bBullet.x + bBullet.radius > player.x + player.width * 0.3 &&
                 bBullet.y - bBullet.radius < player.y + player.height * 0.7 && bBullet.y + bBullet.radius > player.y + player.height * 0.3) {
                 isHit = true;
             }
         } else {
-            ctx.fillStyle = "purple";
-            ctx.fillRect(bBullet.x, bBullet.y, bBullet.width, bBullet.height);
+            ctx.fillStyle = "purple"; ctx.fillRect(bBullet.x, bBullet.y, bBullet.width, bBullet.height);
 
             if (bBullet.x < player.x + player.width * 0.7 && bBullet.x + bBullet.width > player.x + player.width * 0.3 &&
                 bBullet.y < player.y + player.height * 0.7 && bBullet.y + bBullet.height > player.y + player.height * 0.3) {
@@ -434,43 +463,29 @@ function gameLoop() {
             }
         }
         
-        if (isHit) {
-            playerDamage(); 
-            bossBullets.splice(bbIndex, 1);
-        }
-        
-        if (bBullet.y > canvas.height || bBullet.x < -30 || bBullet.x > canvas.width + 30) {
-            bossBullets.splice(bbIndex, 1);
-        }
+        if (isHit) { playerDamage(); bossBullets.splice(bbIndex, 1); }
+        if (bBullet.y > canvas.height || bBullet.x < -30 || bBullet.x > canvas.width + 30) bossBullets.splice(bbIndex, 1);
     });
 
-    // 8. 当たり判定
+    // 8. 当たり判定（★Pool再生に変更）
     bullets.forEach((bullet, bIndex) => {
         enemies.forEach((enemy, eIndex) => {
             if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
                 bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
-                playSE(bufferHit); // ★Web Audio APIでの再生に変更
+                playSE_Hit(bufferHit); 
                 bullets.splice(bIndex, 1);
                 enemy.hp--;
-                if (enemy.hp <= 0) {
-                    enemies.splice(eIndex, 1);
-                    score += (enemy.type === 3) ? 300 : 100;
-                }
+                if (enemy.hp <= 0) { enemies.splice(eIndex, 1); score += (enemy.type === 3) ? 300 : 100; }
             }
         });
 
         if (boss.active && boss.y >= 0) {
             if (bullet.x < boss.x + boss.width && bullet.x + bullet.width > boss.x &&
-                bullet.y < boss.y + boss.height && bullet.y + bullet.height > boss.y) {
-                playSE(bufferHit); // ★Web Audio APIでの再生に変更
+                bullet.y < boss.y + boss.height && bullet.y + boss.height > boss.y) {
+                playSE_Hit(bufferHit); 
                 bullets.splice(bIndex, 1);
                 boss.hp--;
-                
-                if (boss.hp <= 0) {
-                    boss.active = false;      
-                    bossBullets = [];         
-                    isEndingSequence = true;  
-                }
+                if (boss.hp <= 0) { boss.active = false; bossBullets = []; isEndingSequence = true; }
             }
         }
     });
@@ -478,34 +493,18 @@ function gameLoop() {
     // 9. クリア演出シークエンス
     if (isEndingSequence) {
         let targetCenterX = canvas.width / 2 - player.width / 2;
-        if (Math.abs(player.x - targetCenterX) > 2) {
-            player.x += (player.x < targetCenterX) ? 4 : -4;
-        } else {
-            player.x = targetCenterX; 
-            player.y -= 8; 
-            if (player.y + player.height < 0) {
-                gameClear = true;
-            }
-        }
+        if (Math.abs(player.x - targetCenterX) > 2) { player.x += (player.x < targetCenterX) ? 4 : -4; } else { player.x = targetCenterX; player.y -= 8; if (player.y + player.height < 0) { gameClear = true; } }
     }
 
     // 10. 自機の描画
     if (imagesLoaded >= 1) {
-        if (damageCooldown === 0 || Math.floor(damageCooldown / 4) % 2 === 0) {
-            ctx.drawImage(imgPlayer, player.x, player.y, player.width, player.height);
-        }
+        if (damageCooldown === 0 || Math.floor(damageCooldown / 4) % 2 === 0) { ctx.drawImage(imgPlayer, player.x, player.y, player.width, player.height); }
     }
 
     // 11. UI表示
     if (!isEndingSequence) {
-        ctx.fillStyle = "#333";
-        ctx.font = "18px sans-serif";
-        ctx.fillText("SCORE: " + score, 15, 35);
-        
-        let hearts = "";
-        for(let i=0; i<player.hp; i++) hearts += "❤️";
-        ctx.font = "16px sans-serif";
-        ctx.fillText("LIFE: " + hearts, 15, 65);
+        ctx.fillStyle = "#333"; ctx.font = "18px sans-serif"; ctx.fillText("SCORE: " + score, 15, 35);
+        let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ctx.font = "16px sans-serif"; ctx.fillText("LIFE: " + hearts, 15, 65);
     }
 
     requestAnimationFrame(gameLoop);
