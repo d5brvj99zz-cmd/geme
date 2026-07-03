@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>カクつき完全消滅＆バージョン表示版</title>
+    <title>バグ修正完了版！まったりシューティング</title>
     <style>
         * {
             box-sizing: border-box;
@@ -44,8 +44,8 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// ★バージョン設定（ここを書き換えて管理）
-const GAME_VERSION = "1.0.0";
+// ★バージョン設定（バグ修正版）
+const GAME_VERSION = "1.0.1";
 
 // iOS（Safari）のタッチバグを強力に防止
 document.addEventListener('touchmove', function(e) {
@@ -68,15 +68,13 @@ imgEnemy2.onload = imageLoaded;
 imgEnemy3.onload = imageLoaded;
 imgBoss.onload = imageLoaded;
 
-// --- 🔊 【超重要】Web Audio API 多重生成・Pool・デコード補正実装 ---
+// --- 🔊 Web Audio API 多重生成・Pool・デコード補正実装 ---
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
-// 効果音のデータ格納用バッファ
 let bufferShot = null;
 let bufferHit = null;
 
-// ★Pool（ヒット音をあらかじめ3つ生成）
 let poolHit = [];
 let poolHitIndex = 0;
 
@@ -84,7 +82,6 @@ let poolHitIndex = 0;
 const bgmStage = new Audio('sounds/bgm_stage.mp3'); bgmStage.loop = true; bgmStage.volume = 0.25;
 const bgmBoss = new Audio('sounds/bgm_boss.mp3');   bgmBoss.loop = true; bgmBoss.volume = 0.35;
 
-// 音声を事前ロードする関数
 function loadSE(url, callback) {
     fetch(url)
     .then(response => response.arrayBuffer())
@@ -97,13 +94,10 @@ function loadSE(url, callback) {
     }).catch(e => console.error("Fetch error", e));
 }
 
-// 【★修正】多重生成＆デコード遅延補正（カクつきゼロ再生）
 function playSE_Shot(buffer) {
     if (!audioCtx || !buffer) return;
-    
     if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    // 発射のたびに新しいソースを生成（Safariの負荷を回避）
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
     
@@ -113,28 +107,19 @@ function playSE_Shot(buffer) {
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
-    // ★0.01秒（10ms）未来を指定することでSafariのデコード完了を待ち、ピュッとカクつく音割れを防ぐ
     source.start(audioCtx.currentTime + 0.01); 
     
-    // 再生完了後に自動で破棄（メモリに溜まらない）
     source.onended = function() {
         source.disconnect();
         gainNode.disconnect();
     };
 }
 
-// 【★修正】Pool（ヒット音の高速使い回し再生）
 function playSE_Hit(buffer) {
     if (!audioCtx || !buffer) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Poolから使い回す
     const source = poolHit[poolHitIndex];
-    
-    // 再生中なら強制停止（巻き戻しに近いが、newしないので軽量）
-    if (source && source.buffer) {
-        // source.stop(); // Safariでstopするとカクつく場合があるので省略
-    }
     
     const nextSource = audioCtx.createBufferSource();
     nextSource.buffer = buffer;
@@ -145,12 +130,10 @@ function playSE_Hit(buffer) {
     nextSource.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
-    // ★0.01秒（10ms）未来を指定して音割れ補正
     nextSource.start(audioCtx.currentTime + 0.01); 
     
-    // Poolに新しいソースを戻す
     poolHit[poolHitIndex] = nextSource;
-    poolHitIndex = (poolHitIndex + 1) % poolHit.length; // 0, 1, 2 を循環
+    poolHitIndex = (poolHitIndex + 1) % poolHit.length;
 }
 
 function stopAllBGM() {
@@ -194,10 +177,8 @@ function startGame() {
     if (!audioCtx) {
         audioCtx = new AudioContext();
         loadSE('sounds/shot.mp3', (buf) => bufferShot = buf);
-        // ★ロード完了後にPoolを初期化
         loadSE('sounds/hit.mp3', (buf) => {
             bufferHit = buf;
-            // ヒット音のPoolを3つ分あらかじめ生成
             for(let i=0; i<3; i++) {
                 const s = audioCtx.createBufferSource();
                 s.buffer = buf;
@@ -230,7 +211,7 @@ function startGame() {
 function playerDamage() {
     if (damageCooldown > 0 || isEndingSequence) return; 
     player.hp--;
-    playSE_Hit(bufferHit); // ★ Pool再生に変更
+    playSE_Hit(bufferHit); 
     damageCooldown = 45; 
     if (player.hp <= 0) {
         gameOver = true;
@@ -265,7 +246,6 @@ canvas.addEventListener("mousemove", handleMouseMove);
 canvas.addEventListener("touchstart", (e) => { startGame(); }, { passive: true });
 canvas.addEventListener("touchmove", handleTouch, { passive: true });
 
-// 【★修正】バージョン表示付きスタート画面
 function drawStartScreen() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#333";
@@ -273,7 +253,6 @@ function drawStartScreen() {
     ctx.fillText("画面をタップして", 120, 230);
     ctx.fillText("ゲームスタート！", 120, 275);
     
-    // バージョンを表示（右下）
     ctx.fillStyle = "#999";
     ctx.font = "14px sans-serif";
     ctx.fillText("ver " + GAME_VERSION, 330, 485);
@@ -308,7 +287,7 @@ function gameLoop() {
     gameTimer++;
     if (damageCooldown > 0) damageCooldown--; 
 
-    // 1. 自機の連射（★多重生成再生に変更）
+    // 1. 自機の連射
     if (shotTimer === 0 && !isEndingSequence) {
         bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 12 });
         playSE_Shot(bufferShot); 
@@ -420,8 +399,14 @@ function gameLoop() {
                     let targetY = player.y + player.height / 2;
                     let diffX = targetX - bx;
                     let diffY = targetY - by;
-                    let dist = Math.sqrt(diffX * diffX + diffY * dist); // dist*dist に修正
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 2.8, vy: (diffY / dist) * 2.8, isCircle: false });
+                    // ★【バグ修正】distの計算式を正しく修正 (diffY * diffY に直しました)
+                    let dist = Math.sqrt(diffX * diffX + diffY * diffY); 
+                    
+                    if (dist > 0) {
+                        bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 2.8, vy: (diffY / dist) * 2.8, isCircle: false });
+                    } else {
+                        bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0, vy: 2.8, isCircle: false });
+                    }
                 }
                 boss.shotTimer = 80; 
             }
@@ -467,7 +452,7 @@ function gameLoop() {
         if (bBullet.y > canvas.height || bBullet.x < -30 || bBullet.x > canvas.width + 30) bossBullets.splice(bbIndex, 1);
     });
 
-    // 8. 当たり判定（★Pool再生に変更）
+    // 8. 当たり判定
     bullets.forEach((bullet, bIndex) => {
         enemies.forEach((enemy, eIndex) => {
             if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
@@ -481,7 +466,7 @@ function gameLoop() {
 
         if (boss.active && boss.y >= 0) {
             if (bullet.x < boss.x + boss.width && bullet.x + bullet.width > boss.x &&
-                bullet.y < boss.y + boss.height && bullet.y + boss.height > boss.y) {
+                bullet.y < boss.y + boss.height && bullet.y + bullet.height > boss.y) {
                 playSE_Hit(bufferHit); 
                 bullets.splice(bIndex, 1);
                 boss.hp--;
