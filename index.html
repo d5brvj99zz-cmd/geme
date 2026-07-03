@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>メモリ軽量化＆超快適スピード版</title>
+    <title>カクつき完全消滅版！まったりシューティング</title>
     <style>
         * {
             box-sizing: border-box;
@@ -65,32 +65,56 @@ imgEnemy2.onload = imageLoaded;
 imgEnemy3.onload = imageLoaded;
 imgBoss.onload = imageLoaded;
 
-// --- 🔊 【大改善】音声・BGMの設定（使い回し方式にしてメモリ節約） ---
-const seShot = new Audio('sounds/shot.mp3');
-seShot.volume = 0.05;
+// --- 🔊 【超重要】Web Audio API の構築（カクつきの根本治療） ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
 
-const seHit = new Audio('sounds/hit.mp3');
-seHit.volume = 0.05;
+// 効果音のデータ格納用バッファ
+let bufferShot = null;
+let bufferHit = null;
 
-function playSound(audioObject) {
-    // 再生中なら先頭に巻き戻して使い回す（new Audioしないので超軽量！）
-    audioObject.currentTime = 0;
-    audioObject.play().catch(e => console.log("Audio play blocked:", e));
+// BGM（BGMは長いため通常のAudioをそのまま利用、ただし音ズレ回避のため初期化を分離）
+const bgmStage = new Audio('sounds/bgm_stage.mp3'); bgmStage.loop = true; bgmStage.volume = 0.25;
+const bgmBoss = new Audio('sounds/bgm_boss.mp3');   bgmBoss.loop = true; bgmBoss.volume = 0.35;
+
+// 音声を事前ロードする関数
+function loadSE(url, callback) {
+    fetch(url)
+    .then(response => response.arrayBuffer())
+    .then(arrayBuffer => {
+        if (audioCtx) {
+            audioCtx.decodeAudioData(arrayBuffer, (buffer) => {
+                callback(buffer);
+            }, (e) => console.error("Error decoding audio data", e));
+        }
+    }).catch(e => console.error("Fetch error", e));
 }
 
-const bgmStage = new Audio('sounds/bgm_stage.mp3');
-bgmStage.loop = true;
-bgmStage.volume = 0.25;
-
-const bgmBoss = new Audio('sounds/bgm_boss.mp3');
-bgmBoss.loop = true;
-bgmBoss.volume = 0.35;
+// 効果音を遅延ゼロ・カクつきゼロで再生する関数
+function playSE(buffer) {
+    if (!audioCtx || !buffer) return;
+    
+    // iOSのサスペンド（ロック）状態を解除
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    
+    // 音量調整用のノードを挟む
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.05; // 音量5%
+    
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    source.start(0); // 即時再生（ゴミが一切出ない超軽量方式）
+}
 
 function stopAllBGM() {
-    bgmStage.pause();
-    bgmStage.currentTime = 0;
-    bgmBoss.pause();
-    bgmBoss.currentTime = 0;
+    bgmStage.pause(); bgmStage.currentTime = 0;
+    bgmBoss.pause();   bgmBoss.currentTime = 0;
 }
 
 // --- ゲームの設定 ---
@@ -126,6 +150,14 @@ let isEndingSequence = false;
 
 // --- スタート＆リトライ処理 ---
 function startGame() {
+    // 最初のタップ時にオーディオコンテキストを生成（iPhoneの必須セキュリティ対策）
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+        // Web Audio API用の効果音ロードを開始
+        loadSE('sounds/shot.mp3', (buf) => bufferShot = buf);
+        loadSE('sounds/hit.mp3', (buf) => bufferHit = buf);
+    }
+
     if (!gameStarted) {
         gameStarted = true;
         bgmStage.play().catch(e => console.log("BGM play blocked:", e));
@@ -167,7 +199,7 @@ function startGame() {
 function playerDamage() {
     if (damageCooldown > 0 || isEndingSequence) return; 
     player.hp--;
-    playSound(seHit); // ★修正：軽量化したSE再生
+    playSE(bufferHit); // ★Web Audio APIでの再生に変更
     damageCooldown = 45; 
     if (player.hp <= 0) {
         gameOver = true;
@@ -242,7 +274,7 @@ function gameLoop() {
     // 1. 自機の自動連射
     if (shotTimer === 0 && !isEndingSequence) {
         bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 12 });
-        playSound(seShot); // ★修正：軽量化したSE再生
+        playSE(bufferShot); // ★Web Audio APIでの再生に変更
         shotTimer = 20; 
     }
     if (shotTimer > 0) shotTimer--;
@@ -417,7 +449,7 @@ function gameLoop() {
         enemies.forEach((enemy, eIndex) => {
             if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
                 bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
-                playSound(seHit); // ★修正：軽量化したSE再生
+                playSE(bufferHit); // ★Web Audio APIでの再生に変更
                 bullets.splice(bIndex, 1);
                 enemy.hp--;
                 if (enemy.hp <= 0) {
@@ -430,7 +462,7 @@ function gameLoop() {
         if (boss.active && boss.y >= 0) {
             if (bullet.x < boss.x + boss.width && bullet.x + bullet.width > boss.x &&
                 bullet.y < boss.y + boss.height && bullet.y + bullet.height > boss.y) {
-                playSound(seHit); // ★修正：軽量化したSE再生
+                playSE(bufferHit); // ★Web Audio APIでの再生に変更
                 bullets.splice(bIndex, 1);
                 boss.hp--;
                 
