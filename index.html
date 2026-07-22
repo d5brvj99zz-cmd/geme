@@ -1,500 +1,384 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>バグ修正完了版！まったりシューティング</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f0f0f0; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            position: fixed; 
-            touch-action: none; 
-        }
-        canvas {
-            background: #fff; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            border: 2px solid #333;
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            aspect-ratio: 400 / 500;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ファイルブラウザー - Mock</title>
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --muted: #666666;
+      --border: #e0e0e0;
+      --active: #007aff;
+      --hover: #f0f0f0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 450px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Header */
+    .header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--hover);
+      border-radius: 24px;
+      border: none;
+    }
+
+    .search-box input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    .search-box input::placeholder {
+      color: var(--muted);
+    }
+
+    .search-icon {
+      color: var(--muted);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    /* Main content */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .file-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s ease;
+      user-select: none;
+    }
+
+    .file-item:hover {
+      background: var(--hover);
+    }
+
+    .file-item.active {
+      background: rgba(0, 122, 255, 0.1);
+    }
+
+    .file-item.folder {
+      cursor: pointer;
+    }
+
+    .file-item.folder.collapsed .file-icon {
+      transform: rotate(-90deg);
+    }
+
+    .file-icon {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    .toggle-icon {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: transform 0.2s ease;
+      margin-left: auto;
+    }
+
+    .file-item.folder.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      gap: 8px;
+    }
+
+    .footer-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .footer-btn.secondary {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    .footer-btn.secondary:active {
+      background: #e0e0e0;
+    }
+
+    .footer-btn.primary {
+      background: var(--active);
+      color: white;
+    }
+
+    .footer-btn.primary:active {
+      opacity: 0.8;
+    }
+
+    .footer-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Depth indicator */
+    .depth-0 { padding-left: 0; }
+    .depth-1 { padding-left: 24px; }
+    .depth-2 { padding-left: 48px; }
+    .depth-3 { padding-left: 72px; }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="ファイル検索">
+      </div>
+    </div>
 
-<canvas id="gameCanvas" width="400" height="500"></canvas>
+    <!-- Content -->
+    <div class="content">
+      <ul class="file-list" id="fileList"></ul>
+    </div>
 
-<script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+    <!-- Footer -->
+    <div class="footer">
+      <button class="footer-btn secondary" id="cancelBtn">キャンセル</button>
+      <button class="footer-btn primary" id="selectBtn" disabled>選択</button>
+    </div>
+  </div>
 
-// ★バージョン設定（バグ修正版）
-const GAME_VERSION = "1.0.1";
+  <script>
+    // ファイル構造
+    const fileStructure = [
+      {
+        name: 'ドキュメント',
+        type: 'folder',
+        children: [
+          { name: '2024年度計画.pdf', type: 'file', size: '2.4MB' },
+          { name: 'プロジェクト提案書.docx', type: 'file', size: '1.8MB' },
+          {
+            name: '仕事',
+            type: 'folder',
+            children: [
+              { name: '契約書.pdf', type: 'file', size: '892KB' },
+              { name: '請求書テンプレート.xlsx', type: 'file', size: '156KB' },
+              {
+                name: '2024年',
+                type: 'folder',
+                children: [
+                  { name: '1月レポート.xlsx', type: 'file', size: '234KB' },
+                  { name: '2月レポート.xlsx', type: 'file', size: '245KB' },
+                  { name: '3月レポート.xlsx', type: 'file', size: '251KB' },
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'ダウンロード',
+        type: 'folder',
+        children: [
+          { name: 'photo-2024-01-15.jpg', type: 'file', size: '5.2MB' },
+          { name: 'software-installer.exe', type: 'file', size: '245MB' },
+        ]
+      },
+      {
+        name: '写真',
+        type: 'folder',
+        children: [
+          {
+            name: '2023年',
+            type: 'folder',
+            children: [
+              { name: '1月.zip', type: 'file', size: '456MB' },
+              { name: '2月.zip', type: 'file', size: '512MB' },
+            ]
+          },
+          {
+            name: '2024年',
+            type: 'folder',
+            children: [
+              { name: 'スキー旅行.zip', type: 'file', size: '2.1GB' },
+              { name: 'ビーチ.zip', type: 'file', size: '3.2GB' },
+            ]
+          }
+        ]
+      }
+    ];
 
-// iOS（Safari）のタッチバグを強力に防止
-document.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-}, { passive: false });
+    let selectedItem = null;
+    const fileList = document.getElementById('fileList');
+    const selectBtn = document.getElementById('selectBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const searchInput = document.getElementById('searchInput');
 
-// --- 画像の読み込み設定 ---
-const imgPlayer = new Image(); imgPlayer.src = 'images/player.png';
-const imgEnemy1 = new Image(); imgEnemy1.src = 'images/enemy1.png';
-const imgEnemy2 = new Image(); imgEnemy2.src = 'images/enemy2.png';
-const imgEnemy3 = new Image(); imgEnemy3.src = 'images/enemy3.png';
-const imgBoss = new Image();   imgBoss.src = 'images/boss.png'; 
-
-let imagesLoaded = 0;
-const totalImages = 5;
-function imageLoaded() { imagesLoaded++; }
-imgPlayer.onload = imageLoaded;
-imgEnemy1.onload = imageLoaded;
-imgEnemy2.onload = imageLoaded;
-imgEnemy3.onload = imageLoaded;
-imgBoss.onload = imageLoaded;
-
-// --- 🔊 Web Audio API 多重生成・Pool・デコード補正実装 ---
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx = null;
-
-let bufferShot = null;
-let bufferHit = null;
-
-let poolHit = [];
-let poolHitIndex = 0;
-
-// BGM
-const bgmStage = new Audio('sounds/bgm_stage.mp3'); bgmStage.loop = true; bgmStage.volume = 0.25;
-const bgmBoss = new Audio('sounds/bgm_boss.mp3');   bgmBoss.loop = true; bgmBoss.volume = 0.35;
-
-function loadSE(url, callback) {
-    fetch(url)
-    .then(response => response.arrayBuffer())
-    .then(arrayBuffer => {
-        if (audioCtx) {
-            audioCtx.decodeAudioData(arrayBuffer, (buffer) => {
-                callback(buffer);
-            }, (e) => console.error("Error decoding audio data", e));
-        }
-    }).catch(e => console.error("Fetch error", e));
-}
-
-function playSE_Shot(buffer) {
-    if (!audioCtx || !buffer) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.05; 
-    
-    source.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    source.start(audioCtx.currentTime + 0.01); 
-    
-    source.onended = function() {
-        source.disconnect();
-        gainNode.disconnect();
-    };
-}
-
-function playSE_Hit(buffer) {
-    if (!audioCtx || !buffer) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    const source = poolHit[poolHitIndex];
-    
-    const nextSource = audioCtx.createBufferSource();
-    nextSource.buffer = buffer;
-    
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.05; 
-    
-    nextSource.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    nextSource.start(audioCtx.currentTime + 0.01); 
-    
-    poolHit[poolHitIndex] = nextSource;
-    poolHitIndex = (poolHitIndex + 1) % poolHit.length;
-}
-
-function stopAllBGM() {
-    bgmStage.pause(); bgmStage.currentTime = 0;
-    bgmBoss.pause();   bgmBoss.currentTime = 0;
-}
-
-// --- ゲームの設定 ---
-let player = { x: 180, y: 420, width: 48, height: 48, hp: 5, maxHp: 5 }; 
-let bullets = [];
-let enemies = [];
-let score = 0;
-let gameOver = false;
-let gameClear = false;
-let gameStarted = false;
-let shotTimer = 0;
-let damageCooldown = 0; 
-
-let gameTimer = 0; 
-
-let boss = {
-    x: 150,
-    y: -100,
-    baseWidth: 100,  
-    baseHeight: 80,  
-    width: 100, 
-    height: 80,
-    hp: 120,
-    maxHp: 120,
-    speed: 1.5,       
-    active: false, 
-    shotTimer: 0,
-    targetY: 40,      
-    stateTimer: 0     
-};
-let bossBullets = [];
-let isEndingSequence = false; 
-
-// --- スタート＆リトライ処理 ---
-function startGame() {
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
-        loadSE('sounds/shot.mp3', (buf) => bufferShot = buf);
-        loadSE('sounds/hit.mp3', (buf) => {
-            bufferHit = buf;
-            for(let i=0; i<3; i++) {
-                const s = audioCtx.createBufferSource();
-                s.buffer = buf;
-                poolHit.push(s);
-            }
-        });
-    }
-
-    if (!gameStarted) {
-        gameStarted = true;
-        bgmStage.play().catch(e => console.log("BGM play blocked:", e));
-        gameLoop();
-        return;
-    }
-
-    if (gameOver || gameClear) {
-        stopAllBGM();
-        bgmStage.play().catch(e => console.log(e));
-
-        player.x = 180; player.y = 420; player.hp = 5; 
-        damageCooldown = 0; bullets = []; enemies = []; bossBullets = [];
-        score = 0; gameTimer = 0; gameOver = false; gameClear = false; isEndingSequence = false; 
-        boss.x = 150; boss.y = -100; boss.width = 100; boss.height = 80;
-        boss.hp = 120; boss.active = false; boss.shotTimer = 0; boss.targetY = 40; boss.stateTimer = 0;
-        gameLoop();
-    }
-}
-
-// --- プレイヤー被ダメージ処理 ---
-function playerDamage() {
-    if (damageCooldown > 0 || isEndingSequence) return; 
-    player.hp--;
-    playSE_Hit(bufferHit); 
-    damageCooldown = 45; 
-    if (player.hp <= 0) {
-        gameOver = true;
-    }
-}
-
-// --- iPhoneのタッチ位置座標変換 ---
-function getTouchX(clientX) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    return (clientX - rect.left) * scaleX;
-}
-
-function handleMouseMove(e) {
-    if (!gameStarted || gameOver || gameClear || isEndingSequence) return;
-    let canvasX = getTouchX(e.clientX);
-    player.x = canvasX - player.width / 2;
-    if (player.x < 0) player.x = 0;
-    if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
-}
-
-function handleTouch(e) {
-    if (!gameStarted || gameOver || gameClear || isEndingSequence) return;
-    let canvasX = getTouchX(e.touches[0].clientX);
-    player.x = canvasX - player.width / 2;
-    if (player.x < 0) player.x = 0;
-    if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
-}
-
-canvas.addEventListener("mousedown", startGame);
-canvas.addEventListener("mousemove", handleMouseMove);
-canvas.addEventListener("touchstart", (e) => { startGame(); }, { passive: true });
-canvas.addEventListener("touchmove", handleTouch, { passive: true });
-
-function drawStartScreen() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#333";
-    ctx.font = "22px sans-serif";
-    ctx.fillText("画面をタップして", 120, 230);
-    ctx.fillText("ゲームスタート！", 120, 275);
-    
-    ctx.fillStyle = "#999";
-    ctx.font = "14px sans-serif";
-    ctx.fillText("ver " + GAME_VERSION, 330, 485);
-}
-setTimeout(drawStartScreen, 100);
-
-// --- ゲームループ ---
-function gameLoop() {
-    if (gameOver) {
-        stopAllBGM();
-        ctx.fillStyle = "red";
-        ctx.font = "30px sans-serif";
-        ctx.fillText("GAME OVER", 110, 230);
-        ctx.fillStyle = "#333";
-        ctx.font = "20px sans-serif";
-        ctx.fillText("タップでリトライ", 130, 280);
-        return;
-    }
-
-    if (gameClear) {
-        stopAllBGM();
-        ctx.fillStyle = "orange";
-        ctx.font = "36px sans-serif";
-        ctx.fillText("GAME CLEAR !!", 80, 230);
-        ctx.fillStyle = "#333";
-        ctx.font = "20px sans-serif";
-        ctx.fillText("もう一度あそぶ", 130, 290);
-        return;
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    gameTimer++;
-    if (damageCooldown > 0) damageCooldown--; 
-
-    // 1. 自機の連射
-    if (shotTimer === 0 && !isEndingSequence) {
-        bullets.push({ x: player.x + player.width / 2 - 2, y: player.y, width: 4, height: 12 });
-        playSE_Shot(bufferShot); 
-        shotTimer = 20; 
-    }
-    if (shotTimer > 0) shotTimer--;
-
-    // 2. スコア5000点以上でボス戦へ移行
-    if (score >= 5000 && !boss.active && enemies.length === 0 && !isEndingSequence) {
-        boss.active = true;
-        bgmStage.pause();
-        bgmBoss.play().catch(e => console.log(e));
-    }
-
-    // 3. ザコ敵の生成
-    if (!boss.active && score < 5000 && !isEndingSequence) {
-        let spawnChance = 0.012; 
-        if (gameTimer > 3600) spawnChance = 0.022;      
-        else if (gameTimer > 1800) spawnChance = 0.016;       
-
-        if (Math.random() < spawnChance) { 
-            let rand = Math.random();
-            let enemyType, enemyImg, enemySpeed, enemyHp;
-
-            if (rand < 0.5) {
-                enemyType = 1; enemyImg = imgEnemy1; enemyHp = 1;
-                enemySpeed = 1.0 + Math.random() * 0.8;
-            } else if (rand < 0.8) {
-                enemyType = 2; enemyImg = imgEnemy2; enemyHp = 1;
-                enemySpeed = 2.0 + Math.random() * 1.0;
-            } else {
-                enemyType = 3; enemyImg = imgEnemy3; enemyHp = 3;
-                enemySpeed = 0.8 + Math.random() * 0.5;
-            }
-
-            enemies.push({ 
-                x: Math.random() * (canvas.width - 40), y: -40, 
-                width: 40, height: 40, speed: enemySpeed,
-                type: enemyType, img: enemyImg, hp: enemyHp
-            });
-        }
-    }
-
-    // 4. 自機の弾の移動
-    ctx.fillStyle = "#00bfff"; 
-    bullets.forEach((bullet, bIndex) => {
-        bullet.y -= 7;
-        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-        if (bullet.y < 0) bullets.splice(bIndex, 1);
-    });
-
-    // 5. ザコ敵の処理
-    enemies.forEach((enemy, eIndex) => {
-        enemy.y += enemy.speed;
-        if (imagesLoaded >= 4) {
-            ctx.drawImage(enemy.img, enemy.x, enemy.y, enemy.width, enemy.height);
-        }
-        if (enemy.x < player.x + player.width * 0.7 && enemy.x + enemy.width > player.x + player.width * 0.3 &&
-            enemy.y < player.y + player.height * 0.7 && enemy.y + enemy.height > player.y + player.height * 0.3) {
-            playerDamage(); 
-            enemies.splice(eIndex, 1); 
-        }
-        if (enemy.y > canvas.height) enemies.splice(eIndex, 1);
-    });
-
-    // 6. ボスの処理
-    if (boss.active) {
-        if (boss.y < 40 && boss.stateTimer === 0) {
-            boss.y += 0.6; 
-        } else {
-            boss.x += boss.speed;
-            if (boss.x < 0 || boss.x > canvas.width - boss.width) {
-                boss.speed *= -1;
-            }
-
-            if (Math.abs(boss.y - boss.targetY) > 0.5) {
-                boss.y += (boss.y < boss.targetY) ? 1.8 : -1.8;
-            }
-
-            if (boss.stateTimer > 0) {
-                boss.stateTimer--;
-                if (boss.stateTimer === 0) {
-                    boss.targetY = 40; 
-                    boss.width = boss.baseWidth;   
-                    boss.height = boss.baseHeight;
-                }
-            }
-
-            if (boss.shotTimer === 0) {
-                let pattern = Math.random();
-                let bx = boss.x + boss.width / 2;
-                let by = boss.y + boss.height;
-
-                if (pattern < 0.2) {
-                    boss.width = boss.baseWidth * 1.5;
-                    boss.height = boss.baseHeight * 1.5;
-                    boss.stateTimer = 150; 
-                } else if (pattern < 0.4) {
-                    boss.targetY = 180; 
-                    boss.stateTimer = 160;
-                } else if (pattern < 0.6) {
-                    bossBullets.push({ x: bx, y: by, isCircle: true, radius: 20, vx: 0, vy: 2.0 });
-                } else if (pattern < 0.8) {
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: -0.8, vy: 2.4, isCircle: false });
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0,    vy: 2.5, isCircle: false });
-                    bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0.8,  vy: 2.4, isCircle: false });
-                } else {
-                    let targetX = player.x + player.width / 2;
-                    let targetY = player.y + player.height / 2;
-                    let diffX = targetX - bx;
-                    let diffY = targetY - by;
-                    // ★【バグ修正】distの計算式を正しく修正 (diffY * diffY に直しました)
-                    let dist = Math.sqrt(diffX * diffX + diffY * diffY); 
-                    
-                    if (dist > 0) {
-                        bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: (diffX / dist) * 2.8, vy: (diffY / dist) * 2.8, isCircle: false });
-                    } else {
-                        bossBullets.push({ x: bx - 4, y: by, width: 8, height: 16, vx: 0, vy: 2.8, isCircle: false });
-                    }
-                }
-                boss.shotTimer = 80; 
-            }
-        }
-        if (boss.shotTimer > 0) boss.shotTimer--;
-
-        if (imagesLoaded === totalImages) {
-            ctx.drawImage(imgBoss, boss.x, boss.y, boss.width, boss.height);
-        }
-
-        ctx.fillStyle = "#ddd"; ctx.fillRect(100, 15, 200, 8);
-        ctx.fillStyle = "red"; ctx.fillRect(100, 15, 200 * (boss.hp / boss.maxHp), 8);
-
-        if (boss.x < player.x + player.width * 0.7 && boss.x + boss.width > player.x + player.width * 0.3 &&
-            boss.y < player.y + player.height * 0.7 && boss.y + boss.height > player.y + player.height * 0.3) {
-            playerDamage();
-        }
-    }
-
-    // 7. ボスの弾の処理
-    bossBullets.forEach((bBullet, bbIndex) => {
-        bBullet.x += bBullet.vx; bBullet.y += bBullet.vy; 
+    // ファイル一覧を描画
+    function renderFileList(items, depth = 0) {
+      let html = '';
+      items.forEach((item) => {
+        const isFolder = item.type === 'folder';
+        const hasChildren = isFolder && item.children && item.children.length > 0;
+        const icon = isFolder ? '📁' : '📄';
         
-        let isHit = false;
+        html += `
+          <li class="file-item ${isFolder ? 'folder' : 'file'} ${hasChildren ? 'collapsed' : ''} depth-${depth}" data-path="${item.name}" data-type="${item.type}" data-has-children="${hasChildren}">
+            <div class="file-icon">${icon}</div>
+            <div class="file-info">
+              <div class="file-name">${item.name}</div>
+              ${item.size ? `<div class="file-meta">${item.size}</div>` : ''}
+            </div>
+            ${hasChildren ? '<div class="toggle-icon">▶️</div>' : ''}
+          </li>
+        `;
 
-        if (bBullet.isCircle) {
-            ctx.fillStyle = "purple"; ctx.beginPath(); ctx.arc(bBullet.x, bBullet.y, bBullet.radius, 0, Math.PI * 2); ctx.fill();
-
-            if (bBullet.x - bBullet.radius < player.x + player.width * 0.7 && bBullet.x + bBullet.radius > player.x + player.width * 0.3 &&
-                bBullet.y - bBullet.radius < player.y + player.height * 0.7 && bBullet.y + bBullet.radius > player.y + player.height * 0.3) {
-                isHit = true;
-            }
-        } else {
-            ctx.fillStyle = "purple"; ctx.fillRect(bBullet.x, bBullet.y, bBullet.width, bBullet.height);
-
-            if (bBullet.x < player.x + player.width * 0.7 && bBullet.x + bBullet.width > player.x + player.width * 0.3 &&
-                bBullet.y < player.y + player.height * 0.7 && bBullet.y + bBullet.height > player.y + player.height * 0.3) {
-                isHit = true;
-            }
+        if (hasChildren) {
+          html += renderFileList(item.children, depth + 1);
         }
+      });
+      return html;
+    }
+
+    // 初期レンダリング
+    fileList.innerHTML = renderFileList(fileStructure);
+    
+    // 初期状態：深さ0より深いアイテムはすべて隠す
+    document.querySelectorAll('.file-item').forEach(item => {
+      const depth = parseInt(item.className.match(/depth-(\d+)/)[1]);
+      if (depth > 0) {
+        item.style.display = 'none';
+      }
+    });
+
+    // ファイルアイテムのクリックイベント
+    fileList.addEventListener('click', (e) => {
+      const item = e.target.closest('.file-item');
+      if (!item) return;
+
+      const isFolder = item.classList.contains('folder');
+
+      if (isFolder) {
+        // フォルダの展開/折り畳み
+        item.classList.toggle('collapsed');
         
-        if (isHit) { playerDamage(); bossBullets.splice(bbIndex, 1); }
-        if (bBullet.y > canvas.height || bBullet.x < -30 || bBullet.x > canvas.width + 30) bossBullets.splice(bbIndex, 1);
-    });
-
-    // 8. 当たり判定
-    bullets.forEach((bullet, bIndex) => {
-        enemies.forEach((enemy, eIndex) => {
-            if (bullet.x < enemy.x + enemy.width && bullet.x + bullet.width > enemy.x &&
-                bullet.y < enemy.y + enemy.height && bullet.y + bullet.height > enemy.y) {
-                playSE_Hit(bufferHit); 
-                bullets.splice(bIndex, 1);
-                enemy.hp--;
-                if (enemy.hp <= 0) { enemies.splice(eIndex, 1); score += (enemy.type === 3) ? 300 : 100; }
+        // 次のアイテムを取得
+        let nextItem = item.nextElementSibling;
+        
+        // collapsed状態の時に子要素を隠す
+        if (item.classList.contains('collapsed')) {
+          // 次のdepthが高いアイテムをすべて隠す
+          const currentDepth = parseInt(item.className.match(/depth-(\d+)/)[1]);
+          while (nextItem) {
+            const nextDepth = parseInt(nextItem.className.match(/depth-(\d+)/)[1]);
+            if (nextDepth <= currentDepth) break;
+            nextItem.style.display = 'none';
+            nextItem = nextItem.nextElementSibling;
+          }
+        } else {
+          // 次のdepthが1つ高いアイテムだけを表示
+          const currentDepth = parseInt(item.className.match(/depth-(\d+)/)[1]);
+          const nextDepth = currentDepth + 1;
+          while (nextItem) {
+            const itemDepth = parseInt(nextItem.className.match(/depth-(\d+)/)[1]);
+            if (itemDepth < currentDepth) break;
+            if (itemDepth === nextDepth || (itemDepth > nextDepth && nextItem.previousElementSibling && !nextItem.previousElementSibling.classList.contains('collapsed'))) {
+              nextItem.style.display = '';
             }
-        });
-
-        if (boss.active && boss.y >= 0) {
-            if (bullet.x < boss.x + boss.width && bullet.x + bullet.width > boss.x &&
-                bullet.y < boss.y + boss.height && bullet.y + bullet.height > boss.y) {
-                playSE_Hit(bufferHit); 
-                bullets.splice(bIndex, 1);
-                boss.hp--;
-                if (boss.hp <= 0) { boss.active = false; bossBullets = []; isEndingSequence = true; }
-            }
+            nextItem = nextItem.nextElementSibling;
+          }
         }
+      } else {
+        // ファイルの選択
+        document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        selectedItem = item.textContent.trim();
+        selectBtn.disabled = false;
+      }
     });
 
-    // 9. クリア演出シークエンス
-    if (isEndingSequence) {
-        let targetCenterX = canvas.width / 2 - player.width / 2;
-        if (Math.abs(player.x - targetCenterX) > 2) { player.x += (player.x < targetCenterX) ? 4 : -4; } else { player.x = targetCenterX; player.y -= 8; if (player.y + player.height < 0) { gameClear = true; } }
-    }
+    // 選択ボタン
+    selectBtn.addEventListener('click', () => {
+      if (selectedItem) {
+        alert(`選択ファイル: ${selectedItem}`);
+      }
+    });
 
-    // 10. 自機の描画
-    if (imagesLoaded >= 1) {
-        if (damageCooldown === 0 || Math.floor(damageCooldown / 4) % 2 === 0) { ctx.drawImage(imgPlayer, player.x, player.y, player.width, player.height); }
-    }
+    // キャンセルボタン
+    cancelBtn.addEventListener('click', () => {
+      alert('キャンセルしました');
+    });
 
-    // 11. UI表示
-    if (!isEndingSequence) {
-        ctx.fillStyle = "#333"; ctx.font = "18px sans-serif"; ctx.fillText("SCORE: " + score, 15, 35);
-        let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ctx.font = "16px sans-serif"; ctx.fillText("LIFE: " + hearts, 15, 65);
-    }
-
-    requestAnimationFrame(gameLoop);
-}
-</script>
-
+    // 検索機能
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      document.querySelectorAll('.file-item').forEach(item => {
+        const name = item.querySelector('.file-name').textContent.toLowerCase();
+        item.style.display = name.includes(query) ? '' : 'none';
+      });
+    });
+  </script>
 </body>
 </html>
