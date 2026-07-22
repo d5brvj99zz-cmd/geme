@@ -91,8 +91,23 @@
       padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       cursor: pointer;
-      transition: background 0.15s ease;
       user-select: none;
+      transition: all 0.2s ease;
+      opacity: 1;
+      max-height: 100px;
+      overflow: hidden;
+    }
+
+    .file-item.hidden {
+      opacity: 0;
+      max-height: 0;
+      padding: 0 16px;
+      border-bottom: none;
+      pointer-events: none;
+    }
+
+    .file-item.search-hidden {
+      display: none;
     }
 
     .file-item:hover {
@@ -107,10 +122,6 @@
       cursor: pointer;
     }
 
-    .file-item.folder.collapsed .file-icon {
-      transform: rotate(-90deg);
-    }
-
     .file-icon {
       width: 24px;
       height: 24px;
@@ -119,7 +130,6 @@
       align-items: center;
       justify-content: center;
       font-size: 18px;
-      transition: transform 0.2s ease;
     }
 
     .toggle-icon {
@@ -309,49 +319,49 @@
     document.querySelectorAll('.file-item').forEach(item => {
       const depth = parseInt(item.className.match(/depth-(\d+)/)[1]);
       if (depth > 0) {
-        item.style.display = 'none';
+        item.classList.add('hidden');
       }
     });
 
     // ファイルアイテムのクリックイベント
     fileList.addEventListener('click', (e) => {
+      const toggleIcon = e.target.closest('.toggle-icon');
       const item = e.target.closest('.file-item');
       if (!item) return;
 
       const isFolder = item.classList.contains('folder');
 
-      if (isFolder) {
-        // フォルダの展開/折り畳み
+      if (toggleIcon && isFolder) {
+        // トグルボタンをクリック -> フォルダの展開/折り畳みのみ
+        e.stopPropagation();
         item.classList.toggle('collapsed');
         
-        // 次のアイテムを取得
+        const currentDepth = parseInt(item.className.match(/depth-(\d+)/)[1]);
+        const targetDepth = currentDepth + 1;
         let nextItem = item.nextElementSibling;
         
-        // collapsed状態の時に子要素を隠す
-        if (item.classList.contains('collapsed')) {
-          // 次のdepthが高いアイテムをすべて隠す
-          const currentDepth = parseInt(item.className.match(/depth-(\d+)/)[1]);
-          while (nextItem) {
-            const nextDepth = parseInt(nextItem.className.match(/depth-(\d+)/)[1]);
-            if (nextDepth <= currentDepth) break;
-            nextItem.style.display = 'none';
-            nextItem = nextItem.nextElementSibling;
-          }
-        } else {
-          // 次のdepthが1つ高いアイテムだけを表示
-          const currentDepth = parseInt(item.className.match(/depth-(\d+)/)[1]);
-          const nextDepth = currentDepth + 1;
-          while (nextItem) {
-            const itemDepth = parseInt(nextItem.className.match(/depth-(\d+)/)[1]);
-            if (itemDepth < currentDepth) break;
-            if (itemDepth === nextDepth || (itemDepth > nextDepth && nextItem.previousElementSibling && !nextItem.previousElementSibling.classList.contains('collapsed'))) {
-              nextItem.style.display = '';
+        // 直下の子要素のみを表示/非表示
+        while (nextItem) {
+          const nextDepth = parseInt(nextItem.className.match(/depth-(\d+)/)[1]);
+          
+          // 同じレベルまたは浅いレベルに到達したら終了
+          if (nextDepth <= currentDepth) break;
+          
+          // 直下の子要素のみを対象
+          if (nextDepth === targetDepth) {
+            if (item.classList.contains('collapsed')) {
+              nextItem.classList.add('hidden');
+            } else {
+              nextItem.classList.remove('hidden');
             }
-            nextItem = nextItem.nextElementSibling;
+          } else if (nextDepth > targetDepth && item.classList.contains('collapsed')) {
+            nextItem.classList.add('hidden');
           }
+          
+          nextItem = nextItem.nextElementSibling;
         }
       } else {
-        // ファイルの選択
+        // その他の部分をクリック -> ファイル/フォルダを選択
         document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         selectedItem = item.textContent.trim();
@@ -376,7 +386,11 @@
       const query = e.target.value.toLowerCase();
       document.querySelectorAll('.file-item').forEach(item => {
         const name = item.querySelector('.file-name').textContent.toLowerCase();
-        item.style.display = name.includes(query) ? '' : 'none';
+        if (name.includes(query)) {
+          item.classList.remove('search-hidden');
+        } else {
+          item.classList.add('search-hidden');
+        }
       });
     });
   </script>
